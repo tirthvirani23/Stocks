@@ -1,14 +1,21 @@
 # Indian Stock Checkup
 
-Type an NSE or BSE stock symbol (for example `RELIANCE`, `TCS`, `HDFCBANK`) and get:
+A small website for checking Indian stocks (NSE / BSE). Three pages, switched from the bar at the top:
 
-- the latest price
-- fundamental analysis (P/E, P/B, PEG, ROE, margins, debt, cash flow, growth, yearly results)
-- technical analysis (moving averages, RSI, MACD, Bollinger bands, returns, volatility, beta vs Nifty 50)
-- three scores out of 100, with every metric behind each score shown:
-  - **Valuation**: higher = cheaper
-  - **Growth potential**: higher = stronger
-  - **Risk**: higher = riskier
+**Checkup**: type a symbol (for example `RELIANCE`, `TCS`, `HDFCBANK`) or a company name and get
+- the latest price and a one-line summary with the main strengths and concerns
+- three scores out of 100: **Valuation** (higher = cheaper), **Growth potential** (higher = stronger), **Risk** (higher = riskier)
+- Score details: every metric behind each score
+- Technical: line or candlestick chart up to 10 years, moving averages, RSI, MACD, Bollinger bands, support and resistance
+- Fundamentals: ratios, rough fair-value range, yearly and quarterly results, dividends
+- Peers: the largest companies in the same industry
+- Past returns: what an investment made 1, 3, 5 or 10 years ago would be worth, against the Nifty 50 and a fixed deposit
+- News and events: next results date, ex-dividend date, splits and bonuses, headlines
+- buttons to add the stock to your watchlist and to download a PDF summary
+
+**Compare**: two or three stocks side by side.
+
+**Watchlist**: your saved stocks with price and scores in one table. Bookmark the page to keep the list (it is stored in the page address).
 
 Data comes from Yahoo Finance. This is an educational tool, not investment advice.
 
@@ -21,7 +28,8 @@ Data comes from Yahoo Finance. This is an educational tool, not investment advic
    - **Branch**: the branch that contains `app.py`
    - **Main file path**: `app.py`
 4. Click **Deploy**. After two or three minutes you get a web link.
-5. Open that link on your phone or computer any time. Bookmark it or add it to your home screen.
+
+Once deployed, the site updates itself within a few minutes whenever this repository changes. The link stays the same.
 
 ## Run it on your own computer instead
 
@@ -34,5 +42,8 @@ streamlit run app.py
 
 ## Files
 
-- `app.py`: the screen you see
+- `app.py`: start-up and the page menu
+- `views/`: the three pages
 - `analysis.py`: data download, indicators and scoring rules (the point tables are plain lists you can adjust)
+- `ui.py`: shared look and helpers
+- `report.py`: the PDF summary

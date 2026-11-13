@@ -7,6 +7,7 @@ plain tables (value -> points) so they are easy to read and adjust.
 from __future__ import annotations
 
 import math
+import time
 
 import numpy as np
 import pandas as pd
@@ -48,15 +49,15 @@ def cagr(first, last, years):
 # Finding the stock
 # ----------------------------------------------------------------------------
 
-def _history(ticker, period="2y"):
-    h = yf.Ticker(ticker).history(period=period, auto_adjust=True)
+def _history(ticker, period="10y"):
+    h = yf.Ticker(ticker).history(period=period, auto_adjust=False)
     if h is None or h.empty:
         return pd.DataFrame()
     return h.dropna(subset=["Close"])
 
 
 def resolve(query: str):
-    """Turn what the user typed into a Yahoo ticker plus 2 years of prices.
+    """Turn what the user typed into a Yahoo ticker plus up to 10 years of prices.
 
     Tries NSE first, then BSE, then a name search limited to Indian listings.
     """
@@ -91,7 +92,7 @@ def resolve(query: str):
 
     raise ValueError(
         f"Could not find '{query}' on NSE or BSE. Check the symbol "
-        "(for example HDFCBANK, INFY, TATAMOTORS) and try again."
+        "(for example HDFCBANK, INFY, ITC) and try again."
     )
 
 
@@ -277,11 +278,16 @@ def _row(df, names):
     return None
 
 
-def fundamentals(tk: yf.Ticker, price: float) -> dict:
-    try:
-        info = tk.info or {}
-    except Exception:
-        info = {}
+def fundamentals(tk: yf.Ticker, price: float, light: bool = False) -> dict:
+    info = {}
+    for attempt in range(2):
+        try:
+            info = tk.info or {}
+        except Exception:
+            info = {}
+        if info.get("longName") or info.get("shortName"):
+            break
+        time.sleep(1.5)
 
     def safe(attr):
         try:
@@ -289,7 +295,7 @@ def fundamentals(tk: yf.Ticker, price: float) -> dict:
         except Exception:
             return None
 
-    inc, bal, cf = safe("income_stmt"), safe("balance_sheet"), safe("cashflow")
+    inc = safe("income_stmt")
 
     f = {
         "name": info.get("longName") or info.get("shortName"),
@@ -382,7 +388,20 @@ def fundamentals(tk: yf.Ticker, price: float) -> dict:
         f["exp_eps_growth"] = (f["forward_eps"] / f["eps"] - 1) * 100
 
     f["is_financial"] = f["sector"] in FINANCIAL_SECTORS
-    _ = bal, cf
+    f["is_fund"] = f["sector"] is None and revenue is None
+    f["shares"] = num(info.get("sharesOutstanding")) or num(info.get("impliedSharesOutstanding"))
+    if f["shares"] is None and f["market_cap"]:
+        f["shares"] = f["market_cap"] / price
+
+    f["q_revenue"] = f["q_profit"] = None
+    f["events"] = {}
+    if not light:
+        q = safe("quarterly_income_stmt")
+        f["q_revenue"] = _row(q, ["Total Revenue", "Operating Revenue"])
+        f["q_profit"] = _row(q, ["Net Income", "Net Income Common Stockholders"])
+        cal = safe("calendar")
+        if isinstance(cal, dict):
+            f["events"] = cal
     return f
 
 
@@ -429,30 +448,36 @@ def band(v, cuts, labels):
     return labels[-1]
 
 
-def score_valuation(f, t) -> Scorecard:
-    """Higher = cheaper relative to earnings, assets and growth."""
+def score_valuation(f, t, industry_pe=None) -> Scorecard:
+    """Higher = cheaper relative to earnings, assets, growth and industry peers."""
     s = Scorecard()
     fin = f["is_financial"]
 
     pe = f["pe"]
     if pe is not None and pe <= 0:
-        s.add_fixed("FA", "P/E (price ÷ earnings)", "Negative", 5, 30, "Company is loss-making")
+        s.add_fixed("FA", "P/E (price ÷ earnings)", "Negative", 5, 26, "Company is loss-making")
     elif pe is None and f["eps"] is not None and f["eps"] <= 0:
-        s.add_fixed("FA", "P/E (price ÷ earnings)", "Loss-making", 5, 30, "No earnings to value")
+        s.add_fixed("FA", "P/E (price ÷ earnings)", "Loss-making", 5, 26, "No earnings to value")
     else:
         s.add("FA", "P/E (price ÷ earnings)", pe, f"{pe:.1f}" if pe else "",
-              [(5, 100), (10, 90), (15, 80), (20, 65), (30, 45), (45, 25), (70, 8), (100, 0)], 30,
+              [(5, 100), (10, 90), (15, 80), (20, 65), (30, 45), (45, 25), (70, 8), (100, 0)], 26,
               band(pe or 0, [15, 25, 40], ["Cheap", "Fair", "Expensive", "Very expensive"]))
+
+    rel = pe / industry_pe if pe and pe > 0 and industry_pe else None
+    s.add("FA", "P/E compared with industry peers", rel,
+          f"{pe:.1f} vs peer median {industry_pe:.1f}" if rel else "",
+          [(0.4, 100), (0.7, 82), (1, 58), (1.3, 38), (1.8, 15), (2.5, 0)], 12,
+          band(rel or 0, [0.8, 1.2], ["Cheaper than peers", "In line with peers", "Costlier than peers"]))
 
     fpe = f["forward_pe"] if f["forward_pe"] and f["forward_pe"] > 0 else None
     s.add("FA", "Forward P/E (on next year's expected earnings)", fpe, f"{fpe:.1f}" if fpe else "",
-          [(5, 100), (10, 90), (15, 78), (20, 60), (30, 38), (45, 18), (70, 0)], 15,
+          [(5, 100), (10, 90), (15, 78), (20, 60), (30, 38), (45, 18), (70, 0)], 12,
           band(fpe or 0, [14, 22, 35], ["Cheap", "Fair", "Expensive", "Very expensive"]))
 
     peg = f["peg"]
     s.add("FA", "PEG (P/E ÷ profit growth %)", peg,
           f"{peg:.2f} (growth {f['peg_growth']:.0f}%/yr)" if peg else "",
-          [(0.5, 100), (1, 80), (1.5, 60), (2, 40), (3, 15), (4, 0)], 20,
+          [(0.5, 100), (1, 80), (1.5, 60), (2, 40), (3, 15), (4, 0)], 16,
           band(peg or 0, [1, 2], ["Price is justified by growth", "Fair for its growth", "Price runs ahead of growth"]))
 
     pb = f["pb"] if f["pb"] and f["pb"] > 0 else None
@@ -463,7 +488,7 @@ def score_valuation(f, t) -> Scorecard:
     if not fin:
         ev = f["ev_ebitda"] if f["ev_ebitda"] and f["ev_ebitda"] > 0 else None
         s.add("FA", "EV/EBITDA (whole-business value ÷ operating profit)", ev, f"{ev:.1f}" if ev else "",
-              [(5, 100), (8, 85), (12, 65), (18, 40), (25, 20), (40, 0)], 15,
+              [(5, 100), (8, 85), (12, 65), (18, 40), (25, 20), (40, 0)], 14,
               band(ev or 0, [10, 18, 28], ["Cheap", "Fair", "Expensive", "Very expensive"]))
 
     dy = f["div_yield"]
@@ -603,20 +628,281 @@ def score_risk(f, t) -> Scorecard:
 
 
 # ----------------------------------------------------------------------------
+# Peers (same industry, largest companies on NSE)
+# ----------------------------------------------------------------------------
+
+def peers(industry: str | None, size: int = 12) -> list[dict]:
+    if not industry:
+        return []
+    from yfinance import EquityQuery as Q
+
+    name = industry.replace(" - ", "—")
+    try:
+        res = yf.screen(
+            Q("and", [Q("eq", ["region", "in"]), Q("eq", ["industry", name]), Q("eq", ["exchange", "NSI"])]),
+            sortField="intradaymarketcap", sortAsc=False, size=size,
+        )
+    except Exception:
+        return []
+    out = []
+    for q in res.get("quotes", []):
+        sym = q.get("symbol", "")
+        if not sym.endswith(".NS"):
+            continue
+        out.append({
+            "ticker": sym,
+            "symbol": sym[:-3],
+            "name": (q.get("longName") or q.get("shortName") or sym).title(),
+            "price": num(q.get("regularMarketPrice")),
+            "market_cap": num(q.get("marketCap")),
+            "pe": num(q.get("trailingPE")),
+            "forward_pe": num(q.get("forwardPE")),
+            "pb": num(q.get("priceToBook")),
+            "div_yield": num(q.get("dividendYield")),
+            "change_1y": num(q.get("fiftyTwoWeekChangePercent")),
+        })
+    return out
+
+
+def median_pe(peer_list: list[dict]):
+    vals = [p["pe"] for p in peer_list if p["pe"] and 0 < p["pe"] < 200]
+    return float(np.median(vals)) if len(vals) >= 4 else None
+
+
+# ----------------------------------------------------------------------------
+# Support and resistance
+# ----------------------------------------------------------------------------
+
+def support_resistance(d: pd.DataFrame, price: float) -> dict:
+    v = d.tail(250)
+    w = 7
+    highs, lows = v["High"], v["Low"]
+    levels = []
+    for i in range(w, len(v) - w):
+        if highs.iloc[i] == highs.iloc[i - w:i + w + 1].max():
+            levels.append(float(highs.iloc[i]))
+        if lows.iloc[i] == lows.iloc[i - w:i + w + 1].min():
+            levels.append(float(lows.iloc[i]))
+    levels.sort()
+    merged = []  # group levels that sit within 2% of each other
+    for lv in levels:
+        if merged and lv / merged[-1][0] - 1 < 0.02:
+            merged[-1].append(lv)
+        else:
+            merged.append([lv])
+    zones = [(float(np.mean(g)), len(g)) for g in merged]
+    supports = sorted([z for z in zones if z[0] < price * 0.995], key=lambda z: -z[0])[:2]
+    resistances = sorted([z for z in zones if z[0] > price * 1.005], key=lambda z: z[0])[:2]
+
+    last = d.iloc[-1]
+    h, l, c = float(last["High"]), float(last["Low"]), float(last["Close"])
+    p = (h + l + c) / 3
+    return {
+        "supports": supports,
+        "resistances": resistances,
+        "pivot": {"S2": p - (h - l), "S1": 2 * p - h, "Pivot": p, "R1": 2 * p - l, "R2": p + (h - l)},
+    }
+
+
+# ----------------------------------------------------------------------------
+# Fair value, P/E history, dividends, past returns
+# ----------------------------------------------------------------------------
+
+def fair_value(f: dict, price: float, industry_pe=None, own_pe=None):
+    """Project earnings 5 years ahead, value them at an exit P/E, and discount
+    back at 12% a year. Three scenarios."""
+    eps = f["eps"]
+    if not eps or eps <= 0 or f["loss_years"] or (f["forward_eps"] is not None and f["forward_eps"] <= 0):
+        return None  # earnings too unstable to project
+    rates = [x for x in (f["profit_cagr"], f["exp_eps_growth"], f["rev_cagr"]) if x is not None]
+    if not rates:
+        return None
+    g = float(np.clip(np.mean(rates), 0, 20))
+    anchors = [x for x in (industry_pe, own_pe) if x]
+    exit_pe = float(np.clip(np.mean(anchors) if anchors else 18, 10, 30))
+    rows = []
+    for label, gg, pe in [("Cautious", max(g - 4, 0), exit_pe * 0.8), ("Base", g, exit_pe),
+                          ("Optimistic", g + 4, exit_pe * 1.2)]:
+        value = eps * (1 + gg / 100) ** 5 * pe / 1.12 ** 5
+        rows.append({"case": label, "growth": gg, "exit_pe": pe, "value": value,
+                     "vs_price": (value / price - 1) * 100})
+    return {"rows": rows, "eps": eps, "discount": 12, "years": 5}
+
+
+def pe_history(f: dict, d: pd.DataFrame):
+    """Approximate P/E at each financial year-end: (price x today's share count) / that year's profit."""
+    prof, shares = f["profit_hist"], f["shares"]
+    if prof is None or not shares:
+        return None
+    close = d["Close"].copy()
+    close.index = close.index.tz_localize(None)
+    out = {}
+    for date, ni in prof.items():
+        ni = num(ni)
+        px = close[:pd.Timestamp(date)]
+        if ni and ni > 0 and len(px):
+            pe = float(px.iloc[-1]) * shares / ni
+            if 0 < pe < 300:
+                out[f"FY{pd.Timestamp(date).year}"] = pe
+    if len(out) < 2:
+        return None
+    return {"by_year": out, "average": float(np.mean(list(out.values())))}
+
+
+def dividends_by_year(d: pd.DataFrame):
+    div = d["Dividends"]
+    div = div[div > 0]
+    if div.empty:
+        return None
+    idx = div.index.tz_localize(None)
+    fy = [f"FY{x.year + 1 if x.month >= 4 else x.year}" for x in idx]  # Indian FY: April to March
+    by = div.groupby(fy).sum()
+    return by.tail(6)
+
+
+def splits(d: pd.DataFrame):
+    sp = d["Stock Splits"]
+    sp = sp[sp > 0]
+    return [(i.strftime("%d %b %Y"), float(v)) for i, v in sp.items()]
+
+
+def past_returns(d: pd.DataFrame, bench: pd.DataFrame | None, amount: float, fd_rate: float = 7.0):
+    """What an investment made 1, 3, 5 and 10 years ago would be worth today."""
+    adj = d["Adj Close"].dropna()
+    adj.index = adj.index.tz_localize(None)
+    b = None
+    if bench is not None and not bench.empty:
+        b = bench["Close"].dropna()
+        b.index = b.index.tz_localize(None)
+    end = adj.index[-1]
+    rows = []
+    for y in (1, 3, 5, 10):
+        start = end - pd.DateOffset(years=y)
+        if adj.index[0] > start + pd.Timedelta(days=10):
+            continue
+        s0 = adj[adj.index >= start]
+        row = {"years": y, "start": s0.index[0], "stock": amount * adj.iloc[-1] / s0.iloc[0],
+               "nifty": None, "fd": amount * (1 + fd_rate / 100) ** y}
+        if b is not None and b.index[0] <= start + pd.Timedelta(days=10):
+            b0 = b[b.index >= start]
+            row["nifty"] = amount * b.iloc[-1] / b0.iloc[0]
+        row["stock_cagr"] = ((row["stock"] / amount) ** (1 / y) - 1) * 100
+        rows.append(row)
+    return rows
+
+
+def growth_curves(d: pd.DataFrame, bench: pd.DataFrame | None, amount: float, years: int):
+    adj = d["Adj Close"].dropna()
+    adj.index = adj.index.tz_localize(None).normalize()
+    start = adj.index[-1] - pd.DateOffset(years=years)
+    s = adj[adj.index >= start]
+    out = pd.DataFrame({"Stock": s / s.iloc[0] * amount})
+    if bench is not None and not bench.empty:
+        b = bench["Close"].dropna()
+        b.index = b.index.tz_localize(None).normalize()
+        b = b[b.index >= s.index[0]]
+        if len(b):
+            out["Nifty 50"] = (b / b.iloc[0] * amount).reindex(out.index).ffill()
+    return out
+
+
+# ----------------------------------------------------------------------------
+# News
+# ----------------------------------------------------------------------------
+
+def news(ticker: str, name: str | None) -> list[dict]:
+    items = []
+    try:
+        for n in yf.Ticker(ticker).news or []:
+            c = n.get("content") or n
+            url = (c.get("canonicalUrl") or {}).get("url") or (c.get("clickThroughUrl") or {}).get("url") or c.get("link")
+            title = c.get("title")
+            if title and url:
+                items.append({"title": title, "url": url,
+                              "source": (c.get("provider") or {}).get("displayName") or c.get("publisher") or "",
+                              "date": pd.to_datetime(c.get("pubDate") or c.get("providerPublishTime"),
+                                                     unit=None if c.get("pubDate") else "s", errors="coerce")})
+    except Exception:
+        pass
+    if not items and name:
+        try:
+            short = name.replace(" Limited", "").replace(" Ltd.", "").replace(" Ltd", "")
+            for c in yf.Search(short, news_count=8, max_results=1).news or []:
+                if ticker in (c.get("relatedTickers") or [ticker]):
+                    items.append({"title": c.get("title"), "url": c.get("link"), "source": c.get("publisher") or "",
+                                  "date": pd.to_datetime(c.get("providerPublishTime"), unit="s", errors="coerce")})
+        except Exception:
+            pass
+    return [i for i in items if i["title"] and i["url"]][:8]
+
+
+# ----------------------------------------------------------------------------
+# Plain-language summary
+# ----------------------------------------------------------------------------
+
+LABELS = {
+    "valuation": ["Expensive", "Fairly priced", "Attractively priced"],
+    "growth": ["Weak growth", "Moderate growth", "Strong growth"],
+    "risk": ["Low risk", "Moderate risk", "High risk"],
+}
+
+
+def label(kind: str, score):
+    if score is None:
+        return "Not scored"
+    return LABELS[kind][0 if score < 40 else (1 if score < 60 else 2)]
+
+
+def summarise(r: dict) -> dict:
+    val, gro, risk, t = r["valuation"], r["growth"], r["risk"], r["t"]
+    parts = [label(k, c.score()).lower() for k, c in (("valuation", val), ("growth", gro), ("risk", risk))
+             if c.score() is not None]
+    headline = ", ".join(parts).capitalize() + "." if parts else ""
+    if t["vs_sma200"] is not None:
+        headline += (" The price is in a long-term uptrend." if t["vs_sma200"] > 0 and (t["sma50"] or 0) > (t["sma200"] or 0)
+                     else " The price is in a long-term downtrend." if t["vs_sma200"] < 0 and (t["sma50"] or 0) < (t["sma200"] or 0)
+                     else " The price trend is mixed.")
+
+    good, bad = [], []
+    for card, flip in ((val, False), (gro, False), (risk, True)):
+        for i in card.items:
+            if i["Points"] is None:
+                continue
+            goodness = 100 - i["Points"] if flip else i["Points"]
+            entry = (abs(goodness - 50) * i["Weight"], i["Metric"].split(" (")[0], f"{i['Value']}: {i['Comment'].lower()}")
+            if goodness >= 70:
+                good.append(entry)
+            elif goodness <= 35:
+                bad.append(entry)
+
+    def top(lst):
+        seen, out = set(), []
+        for _, metric, text in sorted(lst, reverse=True):
+            if metric not in seen:
+                seen.add(metric)
+                out.append((metric, text))
+        return out[:3]
+
+    return {"headline": headline, "strengths": top(good), "concerns": top(bad)}
+
+
+# ----------------------------------------------------------------------------
 # One call that does everything
 # ----------------------------------------------------------------------------
 
-def analyse(query: str) -> dict:
+def analyse(query: str, bench: pd.DataFrame | None = None, peers_fn=peers, light: bool = False) -> dict:
+    """light=True skips quarterly results, events and news (used for lists of stocks)."""
     ticker, hist = resolve(query)
-    try:
-        bench = _history(NIFTY)
-    except Exception:
-        bench = None
+    if bench is None:
+        try:
+            bench = _history(NIFTY)
+        except Exception:
+            bench = None
 
     d = add_indicators(hist)
     t = technicals(d, bench)
     tk = yf.Ticker(ticker)
-    f = fundamentals(tk, t["price"])
+    f = fundamentals(tk, t["price"], light=light)
 
     price = f["live_price"] or t["price"]
     prev = f["prev_close"]
@@ -625,8 +911,17 @@ def analyse(query: str) -> dict:
         closes = d["Close"]
         prev = float(closes.iloc[-2]) if abs(float(closes.iloc[-1]) - price) / price < 0.002 else float(closes.iloc[-1])
 
-    val, gro, risk = score_valuation(f, t), score_growth(f, t), score_risk(f, t)
-    return {
+    try:
+        peer_list = peers_fn(f["industry"]) if not f["is_fund"] else []
+    except Exception:
+        peer_list = []
+    ind_pe = median_pe(peer_list)
+
+    val, gro, risk = score_valuation(f, t, ind_pe), score_growth(f, t), score_risk(f, t)
+    if f["is_fund"]:
+        val, gro = Scorecard(), Scorecard()
+
+    r = {
         "ticker": ticker,
         "exchange": "NSE" if ticker.endswith(".NS") else "BSE",
         "symbol": ticker.rsplit(".", 1)[0],
@@ -635,10 +930,22 @@ def analyse(query: str) -> dict:
         "change_pct": (price / prev - 1) * 100 if prev else None,
         "last_date": d.index[-1],
         "hist": d,
+        "bench": bench,
         "t": t,
         "f": f,
         "signals": technical_signals(t),
         "valuation": val,
         "growth": gro,
         "risk": risk,
+        "peers": peer_list,
+        "industry_pe": ind_pe,
+        "levels": support_resistance(d, price),
+        "pe_history": pe_history(f, d),
+        "dividends": dividends_by_year(d),
+        "splits": splits(d),
+        "news": [] if light else news(ticker, f["name"]),
     }
+    own_pe = r["pe_history"]["average"] if r["pe_history"] else None
+    r["fair_value"] = None if f["is_fund"] else fair_value(f, price, ind_pe, own_pe)
+    r["summary"] = summarise(r)
+    return r
