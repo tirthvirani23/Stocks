@@ -847,6 +847,31 @@ LABELS = {
 }
 
 
+def overall(val, gro, risk):
+    """One combined number: the average of Valuation, Growth and safety (100 - Risk)."""
+    parts = [x for x in (val, gro, None if risk is None else 100 - risk) if x is not None]
+    return round(sum(parts) / len(parts)) if len(parts) == 3 else None
+
+
+def score_industry(universe: list[dict], bench, median_list: list[dict], workers: int = 4) -> list[dict]:
+    """Score every stock in an industry list. Stocks whose data cannot be fetched are skipped."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    def one(p):
+        try:
+            r = analyse(p["ticker"], bench=bench, peers_fn=lambda _i: median_list, light=True)
+        except Exception:
+            return None
+        v, g, k = r["valuation"].score(), r["growth"].score(), r["risk"].score()
+        return {"Symbol": r["symbol"], "Company": r["f"]["name"] or p["name"], "Price (₹)": r["price"],
+                "Overall": overall(v, g, k), "Valuation": v, "Growth": g, "Risk": k,
+                "Market value (₹ cr)": round(r["f"]["market_cap"] / 1e7) if r["f"]["market_cap"] else None}
+
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        rows = list(ex.map(one, universe))
+    return [x for x in rows if x and x["Overall"] is not None]
+
+
 def label(kind: str, score):
     if score is None:
         return "Not scored"

@@ -11,6 +11,7 @@ page = st.navigation(
     [
         st.Page("views/checkup.py", title="Checkup", icon=":material/search:", default=True),
         st.Page("views/compare.py", title="Compare", icon=":material/compare_arrows:", url_path="compare"),
+        st.Page("views/builder.py", title="Portfolio Builder", icon=":material/pie_chart:", url_path="portfolio-builder"),
         st.Page("views/watchlist.py", title="Watchlist", icon=":material/star:", url_path="watchlist"),
     ],
     position="top",

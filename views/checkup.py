@@ -93,6 +93,8 @@ elif f["is_financial"]:
     st.info("This is a bank or financial company. Debt ratios, current ratio and EV/EBITDA do not apply "
             "to lenders, so they are left out of the scores and P/B counts for more.")
 
+better_box = st.container()  # filled at the end, so the rest of the page appears first
+
 # ------------------------------------------------------------------ tabs
 
 tab_scores, tab_ta, tab_fa, tab_peers, tab_ret, tab_news = st.tabs(
@@ -360,19 +362,6 @@ with tab_peers:
                "Dividend yield": st.column_config.NumberColumn(format="%.2f%%"),
                "1-year return": st.column_config.NumberColumn(format="%+.1f%%")}
 
-        if st.toggle("Also score each peer (takes up to a minute)"):
-            scores = {}
-            with st.spinner("Scoring peers…"):
-                for sym in df["ticker"].head(6):
-                    try:
-                        pr = ui.run(sym, True)
-                        scores[sym[:-3]] = (pr["valuation"].score(), pr["growth"].score(), pr["risk"].score())
-                    except Exception:
-                        pass
-            for i, name in enumerate(["Valuation", "Growth", "Risk"]):
-                table[name] = [scores.get(s, (None, None, None))[i] for s in table["Symbol"]]
-            cfg.update({k: ui.SCORE_COLUMNS[k] for k in ("Valuation", "Growth", "Risk")})
-            st.caption("Scores are shown for the six largest companies in the list.")
         table["Market value (₹ cr)"] = table["Market value (₹ cr)"].round(0)
         st.dataframe(table, hide_index=True, width="stretch", column_config=cfg)
         if r["industry_pe"]:
@@ -435,3 +424,42 @@ with tab_news:
                         unsafe_allow_html=True)
     else:
         st.write("No recent headlines found for this stock.")
+
+# ------------------------------------------------------------------ better-scored stocks in the same industry
+
+if not f["is_fund"] and f["industry"]:
+    mine = a.overall(val.score(), gro.score(), risk.score())
+    with better_box:
+        st.markdown("##### Better-scored stocks in the same industry")
+        if mine is None:
+            st.caption("This stock could not be fully scored, so there is nothing to compare against.")
+        else:
+            try:
+                with st.spinner(f"Scoring other {f['industry']} stocks. The first time takes about a minute…"):
+                    rows, listed = ui.industry_scores(f["industry"])
+            except Exception:
+                rows, listed = None, 0
+                st.caption("The industry list could not be loaded right now. Press Analyse again in a minute.")
+            if rows is not None:
+                others = [x for x in rows if x["Symbol"] != r["symbol"]]
+                better = sorted([x for x in others if x["Overall"] > mine], key=lambda x: -x["Overall"])
+                rank = 1 + len(better)
+                st.markdown(f"**{r['symbol']}** has an overall score of **{mine}** and ranks **{rank} of "
+                            f"{len(others) + 1}** in {f['industry']}. "
+                            + (f"**{len(better)}** score higher:" if better else "None of the others score higher."))
+                if better:
+                    df = pd.DataFrame(better)
+                    event = st.dataframe(df, hide_index=True, width="stretch", column_config=ui.COMPACT_COLUMNS,
+                                         height=min(35 * (len(df) + 1) + 3, 318),
+                                         on_select="rerun", selection_mode="single-row", key=f"better_{r['symbol']}")
+                    if event.selection.rows:
+                        sym = df.iloc[event.selection.rows[0]]["Symbol"]
+
+                        def open_stock(s=sym):
+                            st.session_state["symbol"] = s
+
+                        st.button(f"Open {sym} checkup", type="primary", on_click=open_stock)
+                st.caption("Overall = average of Valuation, Growth and (100 − Risk). "
+                           + (f"Covers the {listed} largest NSE-listed companies in this industry. "
+                              if listed >= ui.INDUSTRY_LIMIT else "Covers every NSE-listed company Yahoo places in this industry. ")
+                           + "Tick a row to open that stock.")

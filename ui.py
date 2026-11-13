@@ -47,6 +47,20 @@ def peers(industry):
     return a.peers(industry)
 
 
+INDUSTRY_LIMIT = 100   # Checkup page: how many of an industry's largest stocks are scored
+BUILDER_LIMIT = 40     # Portfolio Builder: per Yahoo industry
+
+
+@st.cache_data(ttl=12 * 3600, show_spinner=False)
+def industry_scores(industry, limit=INDUSTRY_LIMIT):
+    """Scores for the largest NSE stocks in an industry. Returns (rows, number of stocks in the list)."""
+    universe = a.peers(industry, size=limit)
+    rows = a.score_industry(universe, nifty(), peers(industry))
+    if len(rows) < max(1, len(universe) // 2):
+        raise RuntimeError("too few stocks could be scored")  # do not keep a half-empty result
+    return rows, len(universe)
+
+
 @st.cache_data(ttl=600, show_spinner=False)
 def run(query: str, light: bool = False):
     return a.analyse(query, bench=nifty(), peers_fn=peers, light=light)
@@ -137,7 +151,18 @@ SCORE_COLUMNS = {
     "Price (₹)": st.column_config.NumberColumn(format="₹%.2f"),
     "Day change": st.column_config.NumberColumn(format="%+.2f%%"),
     "1-year return": st.column_config.NumberColumn(format="%+.1f%%"),
+    "Overall": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d",
+                                               help="Average of Valuation, Growth and (100 − Risk). Higher = better"),
+    "Market value (₹ cr)": st.column_config.NumberColumn(format="localized"),
     "Valuation": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d", help="Higher = cheaper"),
     "Growth": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d", help="Higher = stronger"),
     "Risk": st.column_config.ProgressColumn(min_value=0, max_value=100, format="%d", help="Higher = riskier"),
+}
+
+# Narrow version for wide tables: a bar for Overall, plain numbers for the three scores
+COMPACT_COLUMNS = {
+    **SCORE_COLUMNS,
+    "Valuation": st.column_config.NumberColumn(help="Out of 100. Higher = cheaper"),
+    "Growth": st.column_config.NumberColumn(help="Out of 100. Higher = stronger"),
+    "Risk": st.column_config.NumberColumn(help="Out of 100. Higher = riskier"),
 }

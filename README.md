@@ -1,6 +1,6 @@
 # Indian Stock Checkup
 
-A small website for checking Indian stocks (NSE / BSE). Three pages, switched from the bar at the top:
+A small website for checking Indian stocks (NSE / BSE). Four pages, switched from the bar at the top:
 
 **Checkup**: type a symbol (for example `RELIANCE`, `TCS`, `HDFCBANK`) or a company name and get
 - the latest price and a one-line summary with the main strengths and concerns
@@ -11,9 +11,12 @@ A small website for checking Indian stocks (NSE / BSE). Three pages, switched fr
 - Peers: the largest companies in the same industry
 - Past returns: what an investment made 1, 3, 5 or 10 years ago would be worth, against the Nifty 50 and a fixed deposit
 - News and events: next results date, ex-dividend date, splits and bonuses, headlines
+- a list of stocks in the same industry that score better overall
 - buttons to add the stock to your watchlist and to download a PDF summary
 
 **Compare**: two or three stocks side by side.
+
+**Portfolio Builder**: tick the industries you like and get a sample portfolio made of the three best-scored stocks in each.
 
 **Watchlist**: your saved stocks with price and scores in one table. Bookmark the page to keep the list (it is stored in the page address).
 
@@ -43,7 +46,7 @@ streamlit run app.py
 ## Files
 
 - `app.py`: start-up and the page menu
-- `views/`: the three pages
+- `views/`: the four pages
 - `analysis.py`: data download, indicators and scoring rules (the point tables are plain lists you can adjust)
 - `ui.py`: shared look and helpers
 - `report.py`: the PDF summary
