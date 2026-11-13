@@ -278,16 +278,146 @@ def _row(df, names):
     return None
 
 
-def fundamentals(tk: yf.Ticker, price: float, light: bool = False) -> dict:
-    info = {}
-    for attempt in range(2):
+_info_blocked_until = 0.0
+_STATIC = None
+
+
+def static_industries() -> dict:
+    """Built-in list of NSE stocks by industry, used when Yahoo's live industry list is unavailable."""
+    global _STATIC
+    if _STATIC is None:
+        import json
+        import pathlib
         try:
-            info = tk.info or {}
+            _STATIC = json.loads((pathlib.Path(__file__).parent / "data" / "industries.json").read_text("utf-8"))
+        except Exception:
+            _STATIC = {}
+    return _STATIC
+
+
+def static_lookup(ticker: str):
+    """(name, sector, industry) for a ticker from the built-in list, or None."""
+    for industry, block in static_industries().items():
+        for st_ in block["stocks"]:
+            if st_["ticker"] == ticker:
+                return st_["name"], block["sector"], industry
+    return None
+
+
+def _latest(df, names):
+    s = _row(df, names)
+    return num(s.iloc[-1]) if s is not None else None
+
+
+def _fill_from_statements(f: dict, tk: yf.Ticker, inc, quarterly, price: float, hist, light: bool):
+    """Work out the ratios ourselves from the financial statements, for anything Yahoo did not supply."""
+
+    def put(key, value):
+        if f.get(key) is None and value is not None and math.isfinite(value):
+            f[key] = value
+
+    if not f["name"]:
+        found = None
+        if not light:
+            try:
+                for q in yf.Search(tk.ticker.rsplit(".", 1)[0], max_results=8).quotes:
+                    if q.get("symbol") == tk.ticker:
+                        found = (q.get("longname") or q.get("shortname"), q.get("sector"), q.get("industry"))
+                        break
+            except Exception:
+                found = None
+        found = found or static_lookup(tk.ticker)
+        if found:
+            f["name"], f["sector"], f["industry"] = found[0], f["sector"] or found[1], f["industry"] or found[2]
+
+    try:
+        bal = tk.balance_sheet
+    except Exception:
+        bal = None
+    try:
+        shares = num(tk.fast_info["shares"])
+    except Exception:
+        shares = None
+    if not f["market_cap"] and shares:
+        f["market_cap"] = shares * price
+
+    rev = _latest(inc, ["Total Revenue", "Operating Revenue"])
+    ni = _latest(inc, ["Net Income", "Net Income Common Stockholders"])
+    opi = _latest(inc, ["Operating Income"])
+    ebitda = _latest(inc, ["EBITDA", "Normalized EBITDA"])
+
+    eps = None
+    qe = _row(quarterly, ["Diluted EPS", "Basic EPS"])
+    if qe is not None and len(qe) >= 4 and (qe.index[-1] - qe.index[-4]).days <= 290:
+        eps = float(qe.iloc[-4:].sum())  # last four quarters
+    if eps is None:
+        eps = _latest(inc, ["Diluted EPS", "Basic EPS"])
+    put("eps", eps)
+    if f["pe"] is None and f["eps"] and f["eps"] > 0:
+        f["pe"] = price / f["eps"]
+
+    equity = _latest(bal, ["Stockholders Equity", "Common Stock Equity"])
+    total_equity = _latest(bal, ["Total Equity Gross Minority Interest"]) or equity
+    assets = _latest(bal, ["Total Assets"])
+    debt = _latest(bal, ["Total Debt"])
+    cash = _latest(bal, ["Cash Cash Equivalents And Short Term Investments", "Cash And Cash Equivalents"])
+    cur_a, cur_l = _latest(bal, ["Current Assets"]), _latest(bal, ["Current Liabilities"])
+
+    if equity and equity > 0:
+        if shares:
+            put("book_value", equity / shares)
+            put("pb", price / (equity / shares))
+        if ni is not None:
+            put("roe", ni / equity * 100)
+        if debt is not None and total_equity and total_equity > 0:
+            put("debt_equity", debt / total_equity)
+    if assets and ni is not None:
+        put("roa", ni / assets * 100)
+    if rev:
+        if ni is not None:
+            put("profit_margin", ni / rev * 100)
+        if opi is not None:
+            put("op_margin", opi / rev * 100)
+    put("total_debt", debt)
+    put("total_cash", cash)
+    if cur_a and cur_l:
+        put("current_ratio", cur_a / cur_l)
+    if ebitda and ebitda > 0 and f["market_cap"]:
+        put("ev_ebitda", (f["market_cap"] + (debt or 0) - (cash or 0)) / ebitda)
+
+    if hist is not None and "Dividends" in hist:
+        recent = hist["Dividends"][hist.index >= hist.index[-1] - pd.Timedelta(days=365)]
+        put("div_yield", float(recent.sum()) / price * 100)
+
+    for key, names in (("rev_growth_q", ["Total Revenue", "Operating Revenue"]),
+                       ("earn_growth_q", ["Net Income", "Net Income Common Stockholders"])):
+        qs = _row(quarterly, names)
+        if qs is None or len(qs) < 2:
+            continue
+        target = qs.index[-1] - pd.DateOffset(years=1)
+        gaps = [abs((d - target).days) for d in qs.index[:-1]]
+        i = int(np.argmin(gaps))
+        base, last = num(qs.iloc[i]), num(qs.iloc[-1])
+        if gaps[i] <= 20 and base and base > 0 and last is not None:
+            put(key, (last / base - 1) * 100)
+
+
+def fundamentals(tk: yf.Ticker, price: float, light: bool = False, hist=None) -> dict:
+    global _info_blocked_until
+    info = {}
+    attempts = 1 if time.time() < _info_blocked_until else 2
+    for attempt in range(attempts):
+        try:
+            info = yf.Ticker(tk.ticker).info or {}
         except Exception:
             info = {}
         if info.get("longName") or info.get("shortName"):
+            _info_blocked_until = 0
             break
-        time.sleep(1.5)
+        if attempt + 1 < attempts:
+            time.sleep(1.5)
+    else:
+        _info_blocked_until = time.time() + 300  # Yahoo is refusing profiles; don't keep retrying for 5 minutes
 
     def safe(attr):
         try:
@@ -375,6 +505,13 @@ def fundamentals(tk: yf.Ticker, price: float, light: bool = False) -> dict:
         if e is not None and i and abs(i) > 0:
             f["interest_cover"] = e / abs(i)
 
+    f["limited"] = not f["name"]  # Yahoo did not send the company profile
+    quarterly = None
+    if f["limited"] or not light:
+        quarterly = safe("quarterly_income_stmt")
+    if f["limited"] or f["pe"] is None or f["pb"] is None or f["roe"] is None:
+        _fill_from_statements(f, tk, inc, quarterly, price, hist, light)
+
     # Our own PEG: P/E divided by profit growth rate
     f["peg"] = None
     g = f["eps_cagr"] if f["eps_cagr"] is not None else f["profit_cagr"]
@@ -396,7 +533,7 @@ def fundamentals(tk: yf.Ticker, price: float, light: bool = False) -> dict:
     f["q_revenue"] = f["q_profit"] = None
     f["events"] = {}
     if not light:
-        q = safe("quarterly_income_stmt")
+        q = quarterly
         f["q_revenue"] = _row(q, ["Total Revenue", "Operating Revenue"])
         f["q_profit"] = _row(q, ["Net Income", "Net Income Common Stockholders"])
         cal = safe("calendar")
@@ -643,8 +780,13 @@ def peers(industry: str | None, size: int = 12) -> list[dict]:
             sortField="intradaymarketcap", sortAsc=False, size=size,
         )
     except Exception:
-        return []
+        res = {}
     out = []
+    if not res.get("quotes"):
+        block = static_industries().get(name)
+        return [{"ticker": x["ticker"], "symbol": x["ticker"][:-3], "name": x["name"], "price": None,
+                 "market_cap": num(x.get("market_cap")), "pe": None, "forward_pe": None, "pb": None,
+                 "div_yield": None, "change_1y": None} for x in (block["stocks"][:size] if block else [])]
     for q in res.get("quotes", []):
         sym = q.get("symbol", "")
         if not sym.endswith(".NS"):
@@ -927,7 +1069,7 @@ def analyse(query: str, bench: pd.DataFrame | None = None, peers_fn=peers, light
     d = add_indicators(hist)
     t = technicals(d, bench)
     tk = yf.Ticker(ticker)
-    f = fundamentals(tk, t["price"], light=light)
+    f = fundamentals(tk, t["price"], light=light, hist=hist)
 
     price = f["live_price"] or t["price"]
     prev = f["prev_close"]
@@ -969,6 +1111,7 @@ def analyse(query: str, bench: pd.DataFrame | None = None, peers_fn=peers, light
         "dividends": dividends_by_year(d),
         "splits": splits(d),
         "news": [] if light else news(ticker, f["name"]),
+        "limited": f["limited"],
     }
     own_pe = r["pe_history"]["average"] if r["pe_history"] else None
     r["fair_value"] = None if f["is_fund"] else fair_value(f, price, ind_pe, own_pe)

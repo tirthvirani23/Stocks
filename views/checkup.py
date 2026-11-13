@@ -86,6 +86,10 @@ if sm["strengths"] or sm["concerns"]:
         st.markdown("**Watch out for**")
         st.markdown("\n".join(f"- {m}: {txt}" for m, txt in sm["concerns"]) or "- Nothing stands out")
 
+if r["limited"]:
+    st.info("Yahoo Finance is limiting requests right now, so ratios were calculated from the company's latest "
+            "financial statements. Forward P/E, analyst targets and the peer P/E comparison are unavailable, "
+            "and scores can differ by a few points from a normal run.")
 if f["is_fund"]:
     st.info("This looks like an ETF or fund, so there are no company financials. Only the price chart, "
             "risk and past returns apply; valuation and growth are not scored.")
@@ -363,6 +367,7 @@ with tab_peers:
                "1-year return": st.column_config.NumberColumn(format="%+.1f%%")}
 
         table["Market value (₹ cr)"] = table["Market value (₹ cr)"].round(0)
+        table = table.dropna(axis=1, how="all")  # live peer ratios can be unavailable
         st.dataframe(table, hide_index=True, width="stretch", column_config=cfg)
         if r["industry_pe"]:
             st.markdown(f"Median P/E of these peers: **{r['industry_pe']:.1f}**. "
