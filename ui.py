@@ -42,13 +42,7 @@ def nifty():
         return None
 
 
-@st.cache_data(ttl=600, show_spinner=False)
-def history(symbol: str):
-    """(ticker, price history) for a symbol; raises ValueError if it cannot be found."""
-    return a.resolve(symbol)
-
-
-@st.cache_data(ttl=6 * 3600, show_spinner=False)
+@st.cache_data(ttl=6 * 3600, max_entries=200, show_spinner=False)
 def peers(industry):
     return a.peers(industry)
 
@@ -57,7 +51,7 @@ INDUSTRY_LIMIT = 100   # Checkup page: how many of an industry's largest stocks 
 BUILDER_LIMIT = 40     # Portfolio Builder: per Yahoo industry
 
 
-@st.cache_data(ttl=12 * 3600, show_spinner=False)
+@st.cache_data(ttl=12 * 3600, max_entries=150, show_spinner=False)
 def industry_scores(industry, limit=INDUSTRY_LIMIT):
     """Scores for the largest NSE stocks in an industry. Returns (rows, number of stocks in the list)."""
     universe = a.peers(industry, size=limit)
@@ -67,7 +61,8 @@ def industry_scores(industry, limit=INDUSTRY_LIMIT):
     return rows, len(universe)
 
 
-@st.cache_data(ttl=600, show_spinner=False)
+# Each stored result holds years of prices, so only a limited number are kept in memory at once.
+@st.cache_data(ttl=600, max_entries=30, show_spinner=False)
 def run(query: str, light: bool = False):
     return a.analyse(query, bench=nifty(), peers_fn=peers, light=light)
 

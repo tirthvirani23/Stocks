@@ -56,7 +56,7 @@ def _history(ticker, period="10y"):
     return h.dropna(subset=["Close"])
 
 
-def resolve(query: str):
+def resolve(query: str, period: str = "10y"):
     """Turn what the user typed into a Yahoo ticker plus up to 10 years of prices.
 
     Tries NSE first, then BSE, then a name search limited to Indian listings.
@@ -71,7 +71,7 @@ def resolve(query: str):
         candidates = [q + ".NS", q + ".BO"]
 
     for c in candidates:
-        h = _history(c)
+        h = _history(c, period)
         if len(h) >= 30:
             return c, h
 
@@ -86,7 +86,7 @@ def resolve(query: str):
     for item in quotes:
         sym = item.get("symbol", "")
         if sym.endswith((".NS", ".BO")) and item.get("quoteType") == "EQUITY":
-            h = _history(sym)
+            h = _history(sym, period)
             if len(h) >= 30:
                 return sym, h
 
@@ -1109,7 +1109,7 @@ def summarise(r: dict) -> dict:
 
 def analyse(query: str, bench: pd.DataFrame | None = None, peers_fn=peers, light: bool = False) -> dict:
     """light=True skips quarterly results, events and news (used for lists of stocks)."""
-    ticker, hist = resolve(query)
+    ticker, hist = resolve(query, "5y" if light else "10y")  # lists of stocks need less history: saves memory
     if bench is None:
         try:
             bench = _history(NIFTY)

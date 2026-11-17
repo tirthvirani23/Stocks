@@ -18,7 +18,6 @@ page = st.navigation(
         "Portfolio": [
             st.Page("views/review.py", title="Portfolio Review", icon=":material/fact_check:", url_path="portfolio-review"),
             st.Page("views/builder.py", title="Portfolio Builder", icon=":material/pie_chart:", url_path="portfolio-builder"),
-            st.Page("views/tracker.py", title="Daily Email", icon=":material/mail:", url_path="daily-email"),
         ],
     },
     position="top",

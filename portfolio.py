@@ -1,8 +1,6 @@
-"""Portfolio-level logic: expected-return scenarios, portfolio review and the performance tracker."""
+"""Portfolio-level logic: expected-return scenarios and portfolio review."""
 
 from __future__ import annotations
-
-import datetime as dt
 
 import numpy as np
 import pandas as pd
@@ -161,92 +159,3 @@ def additions(rev: dict, scored: list[dict], limit: int = 5) -> dict:
         if len(fresh) >= limit:
             break
     return {"swaps": swaps, "new_sectors": fresh}
-
-
-# ----------------------------------------------------------------------------
-# Performance tracker (used by the Daily Email page and the daily email job)
-# ----------------------------------------------------------------------------
-
-def _since(close: pd.Series, date: dt.date):
-    """Percent change from the first trading day on or after `date` to the latest close."""
-    s = close[close.index >= pd.Timestamp(date)]
-    if s.empty or close.index[0] > pd.Timestamp(date) + pd.Timedelta(days=10):
-        return None
-    return (close.iloc[-1] / s.iloc[0] - 1) * 100
-
-
-def track(holdings: list[dict], bench: pd.DataFrame | None, history_fn=a.resolve) -> dict:
-    """holdings: [{"symbol", "buy_price", "buy_date" (date), "qty" (optional)}]"""
-    nifty = None
-    if bench is not None and not bench.empty:
-        nifty = bench["Close"].dropna()
-        nifty.index = nifty.index.tz_localize(None).normalize()
-    rows, errors = [], []
-    for h in holdings:
-        try:
-            ticker, hist = history_fn(h["symbol"])
-        except Exception:
-            errors.append(str(h["symbol"]).upper())
-            continue
-        close = hist["Close"].dropna()
-        price, prev = float(close.iloc[-1]), float(close.iloc[-2])
-        qty = h.get("qty") or 1
-        nifty_pct = _since(nifty, h["buy_date"]) if nifty is not None else None
-        gain = (price / h["buy_price"] - 1) * 100
-        rows.append({
-            "symbol": ticker.rsplit(".", 1)[0], "buy_price": h["buy_price"], "buy_date": h["buy_date"], "qty": qty,
-            "price": price, "day": (price / prev - 1) * 100, "gain": gain, "nifty": nifty_pct,
-            "vs_nifty": None if nifty_pct is None else gain - nifty_pct,
-            "invested": h["buy_price"] * qty, "value": price * qty,
-        })
-    out = {"rows": rows, "errors": errors, "as_of": None, "nifty_day": None}
-    if rows:
-        invested, value = sum(x["invested"] for x in rows), sum(x["value"] for x in rows)
-        prev_value = sum(x["value"] / (1 + x["day"] / 100) for x in rows)
-        known = [x for x in rows if x["nifty"] is not None]
-        nifty_value = sum(x["invested"] * (1 + x["nifty"] / 100) for x in known)
-        out.update({
-            "invested": invested, "value": value, "gain": (value / invested - 1) * 100,
-            "day": (value / prev_value - 1) * 100,
-            "nifty_gain": (nifty_value / sum(x["invested"] for x in known) - 1) * 100 if known else None,
-        })
-    if nifty is not None and len(nifty) > 1:
-        out["nifty_day"] = float((nifty.iloc[-1] / nifty.iloc[-2] - 1) * 100)
-        out["as_of"] = nifty.index[-1].date()
-    return out
-
-
-def email_html(result: dict, unsubscribe_url: str, app_url: str) -> str:
-    def pct(x, digits=1):
-        if x is None:
-            return "–"
-        colour = "#1a9d6c" if x >= 0 else "#d8433f"
-        return f'<span style="color:{colour}">{x:+.{digits}f}%</span>'
-
-    cell = 'style="padding:6px 10px;border-bottom:1px solid #e6e6e6;text-align:right"'
-    left = 'style="padding:6px 10px;border-bottom:1px solid #e6e6e6;text-align:left"'
-    body = "".join(
-        f"<tr><td {left}><b>{x['symbol']}</b><br><span style='color:#777;font-size:12px'>"
-        f"bought {x['buy_date']:%d %b %Y} at ₹{x['buy_price']:,.2f}</span></td>"
-        f"<td {cell}>₹{x['price']:,.2f}</td><td {cell}>{pct(x['day'], 2)}</td><td {cell}>{pct(x['gain'])}</td>"
-        f"<td {cell}>{pct(x['nifty'])}</td><td {cell}>{pct(x['vs_nifty'])}</td></tr>"
-        for x in result["rows"])
-    verdict_txt = ""
-    if result.get("nifty_gain") is not None:
-        diff = result["gain"] - result["nifty_gain"]
-        verdict_txt = (f"The same money put into the Nifty 50 on the same dates would be {pct(result['nifty_gain'])}. "
-                       f"You are {'ahead of' if diff >= 0 else 'behind'} the Nifty by <b>{abs(diff):.1f}</b> percentage points.")
-    as_of = f"{result['as_of']:%d %b %Y}" if result.get("as_of") else ""
-    return f"""<div style="font-family:Arial,Helvetica,sans-serif;max-width:640px;color:#222">
-<h2 style="margin:0 0 4px">Your stocks today</h2>
-<div style="color:#777;font-size:13px">Prices as of {as_of} (latest available, may be delayed)</div>
-<p style="font-size:15px">Portfolio value <b>₹{result['value']:,.0f}</b> on ₹{result['invested']:,.0f} invested:
-{pct(result['gain'])} overall, {pct(result['day'], 2)} today.
-Nifty 50 today: {pct(result['nifty_day'], 2)}.<br>{verdict_txt}</p>
-<table style="border-collapse:collapse;width:100%;font-size:14px">
-<tr style="background:#f4f4f4"><th {left}>Stock</th><th {cell}>Price</th><th {cell}>Today</th>
-<th {cell}>Since you bought</th><th {cell}>Nifty, same period</th><th {cell}>Versus Nifty</th></tr>
-{body}</table>
-<p style="color:#777;font-size:12px;margin-top:18px">Sent by Indian Stock Checkup (<a href="{app_url}">open the site</a>).
-Data: Yahoo Finance. Educational only, not investment advice.<br>
-<a href="{unsubscribe_url}">Stop these emails</a></p></div>"""

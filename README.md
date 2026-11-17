@@ -11,7 +11,6 @@ A small website for checking Indian stocks (NSE / BSE). The menu at the top has 
 **Portfolio**
 - **Portfolio Review**: upload a screenshot of your holdings (or type them). You get a portfolio rating, bear / neutral / bull return scenarios for 1 and 5 years, a verdict on each holding and suggested changes.
 - **Portfolio Builder**: tick industries and get a sample portfolio of the three best-scored stocks in each.
-- **Daily Email**: enter what you bought, at what price and when; see how each stock has done against the Nifty 50, and receive that by email every weekday around 12 noon India time.
 
 Data comes from Yahoo Finance. This is an educational tool, not investment advice.
 
@@ -36,39 +35,9 @@ pip install -r requirements.txt
 streamlit run app.py
 ```
 
-## Automatic jobs
+## Automatic job
 
-Two jobs run by themselves on GitHub (see the **Actions** tab of the repository):
-
-- **Monthly scores (Top 20)**: 1st of each month. Needs no setup.
-- **Daily email**: Monday to Friday at about 12 noon India time. Needs the one-time setup below.
-
-You can also start either job by hand: Actions tab → pick the job → **Run workflow**.
-
-## Switching on the daily email (one time, about 15 minutes)
-
-The site needs an email account to send from, and permission to save subscribers' lists.
-
-**1. Create a sending email account.** Make a new Gmail address used only for this (recipients will see this address). Turn on 2-Step Verification for it, then open https://myaccount.google.com/apppasswords, create an app password and copy the 16 letters.
-
-**2. Create a GitHub access token.** GitHub → your picture → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token. Under *Repository access* choose *Only select repositories* and pick this repository. Under *Permissions → Repository permissions* set **Contents** to **Read and write**. Generate and copy the token.
-
-**3. Invent a long secret phrase** (any sentence of 20+ characters). It encrypts the subscriber list. Keep a copy: if it is lost or changed, existing subscriptions can no longer be read.
-
-**4. Add the values to the website.** https://share.streamlit.io → ⋮ next to the app → Settings → Secrets. Paste, with your own values:
-
-```
-SMTP_USER = "your-sending-address@gmail.com"
-SMTP_PASSWORD = "the 16-letter app password"
-GH_TOKEN = "the GitHub token"
-GH_REPO = "your-github-name/Stocks"
-DATA_KEY = "your long secret phrase"
-APP_URL = "https://your-app-address.streamlit.app"
-```
-
-**5. Add three of them to GitHub as well** (the daily job runs there). Repository → Settings → Secrets and variables → Actions → New repository secret. Add `SMTP_USER`, `SMTP_PASSWORD` and `DATA_KEY` with exactly the same values as in step 4. Then, on the *Variables* tab next to it, add a variable `APP_URL` with your app address.
-
-After this the Daily Email page shows the sign-up form. Subscribers confirm their address with a 6-digit code, and every email carries a link to stop.
+On the 1st of each month a job on GitHub (see the **Actions** tab of the repository) re-scores all large and mid-size companies for the Top 20 page. It needs no setup. To run it by hand: Actions tab → **Monthly scores (Top 20)** → **Run workflow**.
 
 ## Files
 
@@ -77,8 +46,7 @@ After this the Daily Email page shows the sign-up form. Subscribers confirm thei
 - `analysis.py`: data download, indicators and scoring rules (the point tables are plain lists you can adjust)
 - `ui.py`: shared look and helpers
 - `report.py`: the PDF summary
-- `portfolio.py`: return scenarios, portfolio review and the performance tracker
+- `portfolio.py`: return scenarios and portfolio review
 - `ocr.py`: reads portfolio screenshots
-- `store.py`, `mailer.py`, `settings.py`: subscriber storage, email sending, configuration
-- `jobs/` and `.github/workflows/`: the monthly and daily automatic jobs
+- `jobs/` and `.github/workflows/`: the monthly automatic job
 - `data/`: the built-in industry list and the monthly scores
