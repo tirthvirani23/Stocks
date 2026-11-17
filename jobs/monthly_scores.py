@@ -8,6 +8,7 @@ import datetime as dt
 import json
 import pathlib
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -49,10 +50,22 @@ def main():
                 "Market value (₹ cr)": round(cap / 1e7) if cap else None,
                 "Coverage": round(min(r["valuation"].coverage(), r["growth"].coverage(), r["risk"].coverage()), 2)}
 
-    with ThreadPoolExecutor(max_workers=4) as ex:
-        rows = [x for x in ex.map(one, universe) if x]
+    # Yahoo throttles bursts of requests, so anything that fails is retried after a pause, more gently each time.
+    rows, todo = [], universe
+    for attempt, (workers, pause) in enumerate([(4, 0), (2, 90), (2, 180), (1, 300)]):
+        if not todo:
+            break
+        if pause:
+            print(f"Retrying {len(todo)} after a {pause}-second pause…", flush=True)
+            time.sleep(pause)
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            results = list(ex.map(one, todo))
+        rows += [x for x in results if x]
+        todo = [item for item, x in zip(todo, results) if x is None]
+        print(f"Pass {attempt + 1}: {len(rows)} scored, {len(todo)} left", flush=True)
+
     print(f"Scored {len(rows)} of {len(universe)}", flush=True)
-    if len(rows) < len(universe) * 0.5:
+    if len(rows) < len(universe) * 0.8:
         print("Too few companies could be scored; keeping the previous file.")
         sys.exit(1)
 
