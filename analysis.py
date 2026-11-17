@@ -280,6 +280,47 @@ def _row(df, names):
 
 _info_blocked_until = 0.0
 _STATIC = None
+_FX = {}
+
+
+def fx_to_inr(currency: str):
+    """Rupees per one unit of a foreign currency (latest), or None if it cannot be fetched."""
+    if currency not in _FX:
+        try:
+            h = yf.Ticker(f"{currency}INR=X").history(period="5d")
+            _FX[currency] = float(h["Close"].dropna().iloc[-1])
+        except Exception:
+            return None
+    return _FX[currency]
+
+
+def statement_rate(inc, price: float, eps_known):
+    """Yahoo publishes a few Indian companies' accounts in US dollars (Infosys, for one) and its own
+    currency label is unreliable, so decide from the numbers: if earnings per share only make sense
+    after converting from dollars, convert. Returns (rupees per unit, currency name)."""
+    eps_s = None
+    row = _row(inc, ["Diluted EPS", "Basic EPS"])
+    if row is not None:
+        eps_s = num(row.iloc[-1])
+    if not eps_s or eps_s <= 0:
+        return 1.0, "INR"
+    looks_foreign = False
+    if eps_known and eps_known > 0:
+        looks_foreign = eps_known / eps_s > 20        # the per-share figure in rupees is far larger
+    else:
+        looks_foreign = price / eps_s > 250           # an impossible P/E unless the EPS is in dollars
+    if not looks_foreign:
+        return 1.0, "INR"
+    usd = fx_to_inr("USD")
+    if usd and 2 < price / (eps_s * usd) < 250:
+        return usd, "USD"
+    return 1.0, "INR"
+
+
+def _to_inr(df, rate):
+    if df is None or getattr(df, "empty", True) or rate == 1:
+        return df
+    return df.apply(pd.to_numeric, errors="coerce") * rate
 
 
 def static_industries() -> dict:
@@ -309,7 +350,8 @@ def _latest(df, names):
     return num(s.iloc[-1]) if s is not None else None
 
 
-def _fill_from_statements(f: dict, tk: yf.Ticker, inc, quarterly, price: float, hist, light: bool):
+def _fill_from_statements(f: dict, tk: yf.Ticker, inc, quarterly, price: float, hist, light: bool,
+                          rate: float = 1.0, mix_ok: bool = True):
     """Work out the ratios ourselves from the financial statements, for anything Yahoo did not supply."""
 
     def put(key, value):
@@ -331,7 +373,7 @@ def _fill_from_statements(f: dict, tk: yf.Ticker, inc, quarterly, price: float, 
             f["name"], f["sector"], f["industry"] = found[0], f["sector"] or found[1], f["industry"] or found[2]
 
     try:
-        bal = tk.balance_sheet
+        bal = _to_inr(tk.balance_sheet, rate)
     except Exception:
         bal = None
     try:
@@ -352,8 +394,9 @@ def _fill_from_statements(f: dict, tk: yf.Ticker, inc, quarterly, price: float, 
         eps = float(qe.iloc[-4:].sum())  # last four quarters
     if eps is None:
         eps = _latest(inc, ["Diluted EPS", "Basic EPS"])
-    put("eps", eps)
-    if f["pe"] is None and f["eps"] and f["eps"] > 0:
+    if mix_ok:
+        put("eps", eps)
+    if mix_ok and f["pe"] is None and f["eps"] and f["eps"] > 0:
         f["pe"] = price / f["eps"]
 
     equity = _latest(bal, ["Stockholders Equity", "Common Stock Equity"])
@@ -364,7 +407,7 @@ def _fill_from_statements(f: dict, tk: yf.Ticker, inc, quarterly, price: float, 
     cur_a, cur_l = _latest(bal, ["Current Assets"]), _latest(bal, ["Current Liabilities"])
 
     if equity and equity > 0:
-        if shares:
+        if shares and mix_ok:
             put("book_value", equity / shares)
             put("pb", price / (equity / shares))
         if ni is not None:
@@ -382,7 +425,7 @@ def _fill_from_statements(f: dict, tk: yf.Ticker, inc, quarterly, price: float, 
     put("total_cash", cash)
     if cur_a and cur_l:
         put("current_ratio", cur_a / cur_l)
-    if ebitda and ebitda > 0 and f["market_cap"]:
+    if mix_ok and ebitda and ebitda > 0 and f["market_cap"]:
         put("ev_ebitda", (f["market_cap"] + (debt or 0) - (cash or 0)) / ebitda)
 
     if hist is not None and "Dividends" in hist:
@@ -425,7 +468,10 @@ def fundamentals(tk: yf.Ticker, price: float, light: bool = False, hist=None) ->
         except Exception:
             return None
 
-    inc = safe("income_stmt")
+    raw_inc = safe("income_stmt")
+    rate, currency = statement_rate(raw_inc, price, num(info.get("trailingEps")))
+    mix_ok = True
+    inc = _to_inr(raw_inc, rate)
 
     f = {
         "name": info.get("longName") or info.get("shortName"),
@@ -508,9 +554,12 @@ def fundamentals(tk: yf.Ticker, price: float, light: bool = False, hist=None) ->
     f["limited"] = not f["name"]  # Yahoo did not send the company profile
     quarterly = None
     if f["limited"] or not light:
-        quarterly = safe("quarterly_income_stmt")
-    if f["limited"] or f["pe"] is None or f["pb"] is None or f["roe"] is None:
-        _fill_from_statements(f, tk, inc, quarterly, price, hist, light)
+        quarterly = _to_inr(safe("quarterly_income_stmt"), rate)
+    f["currency"] = currency
+    if f["ev_ebitda"] is not None and not 0 < f["ev_ebitda"] < 150:
+        f["ev_ebitda"] = None  # Yahoo's own figure is sometimes nonsense (mixed currencies); recompute below
+    if f["limited"] or f["ev_ebitda"] is None and not f["sector"] in FINANCIAL_SECTORS or f["pe"] is None or f["pb"] is None or f["roe"] is None:
+        _fill_from_statements(f, tk, inc, quarterly, price, hist, light, rate, mix_ok)
 
     # Our own PEG: P/E divided by profit growth rate
     f["peg"] = None
@@ -983,6 +1032,7 @@ def news(ticker: str, name: str | None) -> list[dict]:
 # ----------------------------------------------------------------------------
 
 LABELS = {
+    "overall": ["Weak", "Average", "Strong"],
     "valuation": ["Expensive", "Fairly priced", "Attractively priced"],
     "growth": ["Weak growth", "Moderate growth", "Strong growth"],
     "risk": ["Low risk", "Moderate risk", "High risk"],

@@ -8,12 +8,19 @@ st.set_page_config(page_title="Indian Stock Checkup", page_icon="📈", layout="
 ui.style()
 
 page = st.navigation(
-    [
-        st.Page("views/checkup.py", title="Checkup", icon=":material/search:", default=True),
-        st.Page("views/compare.py", title="Compare", icon=":material/compare_arrows:", url_path="compare"),
-        st.Page("views/builder.py", title="Portfolio Builder", icon=":material/pie_chart:", url_path="portfolio-builder"),
-        st.Page("views/watchlist.py", title="Watchlist", icon=":material/star:", url_path="watchlist"),
-    ],
+    {
+        "Stocks": [
+            st.Page("views/checkup.py", title="Checkup", icon=":material/search:", default=True),
+            st.Page("views/compare.py", title="Compare", icon=":material/compare_arrows:", url_path="compare"),
+            st.Page("views/top20.py", title="Top 20", icon=":material/leaderboard:", url_path="top-20"),
+            st.Page("views/watchlist.py", title="Watchlist", icon=":material/star:", url_path="watchlist"),
+        ],
+        "Portfolio": [
+            st.Page("views/review.py", title="Portfolio Review", icon=":material/fact_check:", url_path="portfolio-review"),
+            st.Page("views/builder.py", title="Portfolio Builder", icon=":material/pie_chart:", url_path="portfolio-builder"),
+            st.Page("views/tracker.py", title="Daily Email", icon=":material/mail:", url_path="daily-email"),
+        ],
+    },
     position="top",
 )
 page.run()

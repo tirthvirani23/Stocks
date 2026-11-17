@@ -4,3 +4,7 @@ pandas>=2.0
 numpy>=1.26
 plotly>=5.20
 fpdf2>=2.7
+pytesseract>=0.3.10
+pillow>=10.0
+cryptography>=42.0
+requests>=2.31

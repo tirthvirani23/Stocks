@@ -42,6 +42,12 @@ def nifty():
         return None
 
 
+@st.cache_data(ttl=600, show_spinner=False)
+def history(symbol: str):
+    """(ticker, price history) for a symbol; raises ValueError if it cannot be found."""
+    return a.resolve(symbol)
+
+
 @st.cache_data(ttl=6 * 3600, show_spinner=False)
 def peers(industry):
     return a.peers(industry)
@@ -166,3 +172,27 @@ COMPACT_COLUMNS = {
     "Growth": st.column_config.NumberColumn(help="Out of 100. Higher = stronger"),
     "Risk": st.column_config.NumberColumn(help="Out of 100. Higher = riskier"),
 }
+
+
+@st.cache_data(ttl=3600, show_spinner=False)
+def monthly_scores():
+    """The file written by the monthly job: {"updated": date text, "rows": [...]}, or None if it is missing."""
+    import json
+    import pathlib
+    try:
+        return json.loads((pathlib.Path(__file__).parent / "data" / "scores.json").read_text("utf-8"))
+    except Exception:
+        return None
+
+
+class FixedScore:
+    """Lets a plain number be shown with score_card()."""
+
+    def __init__(self, value):
+        self.value = None if value is None else round(value)
+
+    def score(self):
+        return self.value
+
+    def coverage(self):
+        return 1.0
