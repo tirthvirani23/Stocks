@@ -1,0 +1,584 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Virani Dental Bills</title>
+<meta name="apple-mobile-web-app-title" content="Dental Bills">
+<meta name="theme-color" content="#0f766e">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-512.png">
+<style>
+  :root {
+    --teal: #0f766e; --teal-dark: #115e59; --teal-soft: #ccfbf1;
+    --bg: #f4f7f7; --card: #fff; --ink: #0f172a; --muted: #64748b; --line: #e2e8f0;
+    --red: #dc2626; --amber: #b45309;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 17px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Gujarati", sans-serif; }
+  header { background: var(--teal); color: #fff; padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; text-align: center; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: .5px; }
+  header p { margin: 2px 0 0; font-size: 13px; opacity: .85; }
+  main { max-width: 560px; margin: 0 auto; padding: 14px 16px calc(96px + env(safe-area-inset-bottom)); }
+  .tab { display: none; } .tab.on { display: block; }
+  .card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+
+  .lang { display: flex; background: #e2e8f0; border-radius: 12px; padding: 4px; margin-bottom: 14px; }
+  .lang button { flex: 1; border: 0; background: transparent; padding: 10px; border-radius: 9px; font-size: 16px; font-weight: 600; color: var(--muted); }
+  .lang button.on { background: #fff; color: var(--teal); box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+
+  .micwrap { text-align: center; padding: 6px 0 2px; }
+  #mic { width: 190px; height: 190px; border-radius: 50%; border: 0; background: var(--teal); color: #fff;
+    font-size: 20px; font-weight: 700; box-shadow: 0 10px 30px rgba(15,118,110,.35); display: inline-flex;
+    flex-direction: column; align-items: center; justify-content: center; gap: 8px; touch-action: manipulation; }
+  #mic svg { width: 64px; height: 64px; }
+  #mic.live { background: var(--red); box-shadow: 0 0 0 0 rgba(220,38,38,.5); animation: pulse 1.4s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(220,38,38,.45); } 100% { box-shadow: 0 0 0 28px rgba(220,38,38,0); } }
+  .hint { color: var(--muted); font-size: 14px; margin: 12px 0 0; }
+  .heard { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--teal-soft); color: var(--teal-dark); font-size: 15px; min-height: 22px; display: none; }
+  .heard.show { display: block; }
+  .msg { margin-top: 10px; font-size: 14px; color: var(--amber); display: none; }
+  .msg.show { display: block; }
+  .linkbtn { background: none; border: 0; color: var(--teal); font-size: 15px; text-decoration: underline; padding: 8px; }
+
+  label { display: block; font-size: 13px; font-weight: 600; color: var(--muted); margin: 12px 0 4px; text-transform: uppercase; letter-spacing: .4px; }
+  input, select, textarea { width: 100%; font-size: 17px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font-family: inherit; }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--teal); border-color: transparent; }
+  .row2 { display: flex; gap: 10px; } .row2 > div { flex: 1; min-width: 0; }
+  .item { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
+  .item .d { flex: 1 1 100%; min-width: 0; } .item .a { flex: 1; min-width: 0; }
+  .item .x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #fee2e2; color: var(--red); font-size: 20px; line-height: 1; }
+  .add { border: 1px dashed var(--teal); background: #fff; color: var(--teal); border-radius: 10px; padding: 10px; width: 100%; font-size: 15px; font-weight: 600; }
+  .total { display: flex; justify-content: space-between; font-size: 22px; font-weight: 700; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .big { width: 100%; border: 0; border-radius: 14px; background: var(--teal); color: #fff; font-size: 19px; font-weight: 700; padding: 17px; margin-top: 14px; }
+  .big:disabled { opacity: .45; }
+  .ghost { width: 100%; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); font-size: 16px; padding: 13px; margin-top: 10px; }
+
+  nav { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: #fff; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; border: 0; background: none; padding: 10px 0 12px; font-size: 13px; font-weight: 600; color: var(--muted); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  nav button svg { width: 26px; height: 26px; }
+  nav button.on { color: var(--teal); }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+  .stat { background: #fff; border-radius: 14px; padding: 12px 8px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .stat b { display: block; font-size: 18px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  .filters { display: flex; gap: 8px; margin-bottom: 12px; } .filters > * { flex: 1; min-width: 0; }
+  .day { margin: 16px 0 6px; display: flex; justify-content: space-between; font-size: 14px; font-weight: 700; color: var(--teal-dark); }
+  .bill { background: #fff; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; display: flex; justify-content: space-between; gap: 10px; box-shadow: 0 1px 2px rgba(0,0,0,.05); }
+  .bill .l { min-width: 0; } .bill .n { font-weight: 600; } .bill .p { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bill .r { text-align: right; flex: none; } .bill .amt { font-weight: 700; font-variant-numeric: tabular-nums; } .bill .no { font-size: 12px; color: var(--muted); }
+  .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+
+  .sheet { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: none; align-items: flex-end; z-index: 10; }
+  .sheet.show { display: flex; }
+  .sheet .box { background: #fff; width: 100%; max-width: 560px; margin: 0 auto; border-radius: 18px 18px 0 0; padding: 18px 16px calc(18px + env(safe-area-inset-bottom)); }
+  .sheet h3 { margin: 0 0 4px; } .sheet .sub { color: var(--muted); font-size: 14px; margin-bottom: 6px; }
+  .danger { color: var(--red); }
+  .toast { position: fixed; left: 50%; bottom: calc(90px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--ink); color: #fff; padding: 10px 18px; border-radius: 22px; font-size: 15px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 20; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+  .small { font-size: 13px; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Virani Dental Clinic</h1>
+  <p>Bill Maker</p>
+</header>
+
+<main>
+  <!-- ============ NEW BILL ============ -->
+  <section id="tab-new" class="tab on">
+    <div class="lang" id="lang">
+      <button data-l="en-IN" class="on">English</button>
+      <button data-l="gu-IN">ગુજરાતી</button>
+    </div>
+
+    <div class="card micwrap">
+      <button id="mic" aria-label="Tap and speak">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
+        <span id="micLabel">Tap &amp; Speak</span>
+      </button>
+      <p class="hint" id="hint">Say: <i>“Ramesh Patel, root canal, 3500, cash”</i></p>
+      <div class="heard" id="heard"></div>
+      <div class="msg" id="msg"></div>
+      <button class="linkbtn" id="typeToggle">Type instead</button>
+      <div id="typeBox" style="display:none;text-align:left">
+        <textarea id="typed" rows="2" placeholder="e.g. Ramesh Patel RCT 3500"></textarea>
+        <button class="ghost" id="typedGo">Fill the bill from this</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="name">Patient name</label>
+      <input id="name" autocomplete="off" autocapitalize="words" placeholder="Patient name">
+      <div class="row2">
+        <div><label for="date">Date</label><input id="date" type="date"></div>
+        <div><label for="mode">Paid by</label>
+          <select id="mode"><option>Cash</option><option>UPI</option><option>Card</option></select></div>
+      </div>
+      <label>Treatment &amp; amount (Rs.)</label>
+      <div id="items"></div>
+      <button class="add" id="addItem">+ Add treatment</button>
+      <div class="total"><span>Total</span><span id="total">Rs. 0</span></div>
+      <button class="big" id="make" disabled>Make Bill (PDF)</button>
+      <button class="ghost" id="clear">Clear</button>
+    </div>
+    <datalist id="procList"></datalist>
+  </section>
+
+  <!-- ============ HISTORY ============ -->
+  <section id="tab-hist" class="tab">
+    <div class="stats">
+      <div class="stat"><b id="sToday">0</b><span id="sTodayN">Today</span></div>
+      <div class="stat"><b id="sMonth">0</b><span id="sMonthN">This month</span></div>
+      <div class="stat"><b id="sAll">0</b><span id="sAllN">All bills</span></div>
+    </div>
+    <div class="filters">
+      <select id="fMonth"></select>
+      <input id="fSearch" placeholder="Search name" autocomplete="off">
+    </div>
+    <div class="card" style="padding:12px 14px" id="periodBox"><div class="total" style="margin:0;padding:0;border:0;font-size:18px"><span id="periodLabel">Total</span><span id="periodTotal">Rs. 0</span></div></div>
+    <div id="list"></div>
+    <button class="ghost" id="exportCsv">Download list (Excel / CSV)</button>
+    <button class="ghost" id="backup">Backup all bills</button>
+    <button class="ghost" id="restoreBtn">Restore from backup</button>
+    <input type="file" id="restoreFile" accept=".json,application/json" style="display:none">
+    <p class="small" style="text-align:center">Bills are saved only on this phone. Take a backup once a month.</p>
+  </section>
+</main>
+
+<nav>
+  <button data-t="new" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5"/></svg>New Bill</button>
+  <button data-t="hist"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg>History</button>
+</nav>
+
+<div class="sheet" id="sheet"><div class="box">
+  <h3 id="shName"></h3>
+  <div class="sub" id="shSub"></div>
+  <div id="shItems" class="small"></div>
+  <button class="big" id="shShare">Share / Print PDF</button>
+  <button class="ghost" id="shEdit">Make a corrected copy</button>
+  <button class="ghost danger" id="shDel">Delete bill</button>
+  <button class="ghost" id="shClose">Close</button>
+</div></div>
+<div class="toast" id="toast"></div>
+
+<script src="jspdf.umd.min.js"></script>
+<script src="parser.js"></script>
+<script>
+(function () {
+  'use strict';
+  const $ = (id) => document.getElementById(id);
+  const P = window.BillParser;
+  const KEY = 'vdc_bills_v1', CKEY = 'vdc_counter_v1', LKEY = 'vdc_lang';
+  const CLINIC = {
+    name: 'VIRANI DENTAL CLINIC',
+    doctor: 'Dr Sonal Virani',
+    degree: 'BDS, MDS (Prosthodontics)',
+    address: 'Virani Hospital, Gurukul Corner, Dhebar Road, Rajkot-360002',
+    phone: '0281-2367367',
+  };
+
+  // ---------- storage ----------
+  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } }
+  function store(b) { try { localStorage.setItem(KEY, JSON.stringify(b)); return true; } catch (e) { alert('Could not save on this phone: ' + e.message); return false; } }
+  function nextNo(bills) {
+    let c = 0; try { c = parseInt(localStorage.getItem(CKEY) || '0', 10) || 0; } catch (e) {}
+    const max = bills.reduce((m, b) => Math.max(m, b.no || 0), 0);
+    return Math.max(c, max) + 1;
+  }
+  if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+
+  // ---------- helpers ----------
+  const fmt = (n) => (Math.round(Number(n) || 0)).toLocaleString('en-IN');
+  const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  function niceDate(iso, withDay) {
+    const [y, m, d] = iso.split('-').map(Number);
+    const dt = new Date(y, m - 1, d);
+    return (withDay ? DAYS[dt.getDay()] + ', ' : '') + String(d).padStart(2, '0') + ' ' + MON[m - 1] + ' ' + y;
+  }
+  function toast(t) { const el = $('toast'); el.textContent = t; el.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 2200); }
+  function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+
+  // ---------- tabs ----------
+  document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => {
+    document.querySelectorAll('nav button').forEach((x) => x.classList.toggle('on', x === b));
+    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.id === 'tab-' + b.dataset.t));
+    if (b.dataset.t === 'hist') renderHistory();
+    window.scrollTo(0, 0);
+  }));
+
+  // ---------- language ----------
+  let lang = 'en-IN';
+  try { lang = localStorage.getItem(LKEY) || 'en-IN'; } catch (e) {}
+  function setLang(l) {
+    lang = l;
+    try { localStorage.setItem(LKEY, l); } catch (e) {}
+    document.querySelectorAll('#lang button').forEach((b) => b.classList.toggle('on', b.dataset.l === l));
+    $('hint').innerHTML = l === 'gu-IN'
+      ? 'બોલો: <i>“રમેશ પટેલ, રૂટ કેનાલ, સાડા ત્રણ હજાર, રોકડા”</i>'
+      : 'Say: <i>“Ramesh Patel, root canal, 3500, cash”</i>';
+  }
+  document.querySelectorAll('#lang button').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.l)));
+  setLang(lang);
+
+  // ---------- bill form ----------
+  $('procList').innerHTML = P.PROCEDURES.map((p) => '<option value="' + esc(p) + '">').join('');
+  function addItem(desc, amount) {
+    const row = document.createElement('div');
+    row.className = 'item';
+    row.innerHTML = '<input class="d" list="procList" placeholder="Treatment"><input class="a" type="number" inputmode="numeric" placeholder="Rs.">' +
+      '<button class="x" aria-label="Remove">×</button>';
+    row.querySelector('.d').value = desc || '';
+    row.querySelector('.a').value = amount ? Math.round(amount) : '';
+    row.querySelector('.x').addEventListener('click', () => { row.remove(); if (!$('items').children.length) addItem(); update(); });
+    row.querySelectorAll('input').forEach((i) => i.addEventListener('input', update));
+    $('items').appendChild(row);
+  }
+  function readItems() {
+    return Array.from($('items').children).map((r) => ({
+      desc: r.querySelector('.d').value.trim(),
+      amount: Math.round(parseFloat(r.querySelector('.a').value) || 0),
+    })).filter((i) => i.desc || i.amount);
+  }
+  function update() {
+    const items = readItems();
+    const total = items.reduce((s, i) => s + i.amount, 0);
+    $('total').textContent = 'Rs. ' + fmt(total);
+    $('make').disabled = !($('name').value.trim() && total > 0);
+  }
+  function resetForm() {
+    $('name').value = ''; $('date').value = today(); $('mode').value = 'Cash';
+    $('items').innerHTML = ''; addItem();
+    $('heard').classList.remove('show'); $('msg').classList.remove('show');
+    update();
+  }
+  $('name').addEventListener('input', update);
+  $('addItem').addEventListener('click', () => { addItem(); update(); });
+  $('clear').addEventListener('click', resetForm);
+  resetForm();
+
+  function fillFrom(r) {
+    if (r.name) $('name').value = r.name;
+    if (r.items.length) { $('items').innerHTML = ''; r.items.forEach((i) => addItem(i.desc, i.amount)); }
+    if (r.mode) $('mode').value = r.mode;
+    $('date').value = $('date').value || today();
+    update();
+    const missing = [];
+    if (!r.name) missing.push('patient name');
+    if (!r.items.length) missing.push('treatment');
+    if (!r.items.some((i) => i.amount > 0)) missing.push('amount');
+    showMsg(missing.length ? 'Could not catch the ' + missing.join(', ') + ' — please type it below, or tap the mic and say it again.' : '');
+    if (!missing.length) toast('Got it — check and tap Make Bill');
+  }
+  function showMsg(t) { $('msg').textContent = t; $('msg').classList.toggle('show', !!t); }
+
+  $('typeToggle').addEventListener('click', () => {
+    const box = $('typeBox'); const open = box.style.display === 'none';
+    box.style.display = open ? 'block' : 'none';
+    if (open) $('typed').focus();
+  });
+  $('typedGo').addEventListener('click', () => {
+    const t = $('typed').value.trim(); if (!t) return;
+    $('heard').textContent = t; $('heard').classList.add('show');
+    fillFrom(P.best([t]));
+  });
+
+  // ---------- speech ----------
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  let rec = null, listening = false, silenceT = null, hardT = null, finalText = '', interim = '', alts = [];
+
+  function joinResults(results) {
+    // iOS sometimes repeats the whole sentence in each result; avoid doubling.
+    let acc = '';
+    for (const r of results) {
+      const t = r.trim(); if (!t) continue;
+      if (!acc || t.startsWith(acc)) acc = t;
+      else if (!acc.endsWith(t)) acc += ' ' + t;
+    }
+    return acc;
+  }
+
+  function startListening() {
+    if (!SR) {
+      showMsg('Voice is not available in this browser. Open this page in Safari, or use “Type instead” and tap the 🎤 on the keyboard.');
+      $('typeBox').style.display = 'block';
+      return;
+    }
+    rec = new SR();
+    rec.lang = lang;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 5;
+    finalText = ''; interim = ''; alts = [];
+    rec.onresult = (e) => {
+      const finals = [], partial = [], altSets = [];
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        (r.isFinal ? finals : partial).push(r[0].transcript);
+        const a = []; for (let j = 0; j < r.length; j++) a.push(r[j].transcript);
+        altSets.push(a);
+      }
+      finalText = joinResults(finals);
+      interim = joinResults(partial);
+      alts = altSets;
+      const shown = (finalText + ' ' + interim).trim();
+      $('heard').textContent = shown || '…'; $('heard').classList.add('show');
+      clearTimeout(silenceT);
+      silenceT = setTimeout(stopListening, 2500);
+    };
+    rec.onerror = (e) => {
+      const m = {
+        'not-allowed': 'Microphone is blocked. On iPhone: Settings → Safari → Microphone → Allow, and Settings → Siri → turn on “Siri” or dictation.',
+        'service-not-allowed': 'Speech is turned off. On iPhone: Settings → General → Keyboard → turn on “Enable Dictation”, and allow Siri.',
+        'no-speech': 'Did not hear anything. Hold the phone close and speak after tapping.',
+        'network': 'Voice needs internet. Check Wi-Fi / mobile data.',
+        'language-not-supported': 'This phone cannot listen in Gujarati yet — switch to English, or use “Type instead” with the Gujarati keyboard mic.',
+      }[e.error];
+      if (m) showMsg(m);
+    };
+    rec.onend = finish;
+    try { rec.start(); } catch (e) { showMsg('Could not start the mic: ' + e.message); return; }
+    listening = true;
+    $('mic').classList.add('live'); $('micLabel').textContent = 'Listening… tap when done';
+    $('heard').textContent = '…'; $('heard').classList.add('show'); showMsg('');
+    clearTimeout(hardT); hardT = setTimeout(stopListening, 45000);
+  }
+  function stopListening() {
+    clearTimeout(silenceT); clearTimeout(hardT);
+    if (rec && listening) { try { rec.stop(); } catch (e) { finish(); } }
+  }
+  function finish() {
+    if (!listening) return;
+    listening = false;
+    clearTimeout(silenceT); clearTimeout(hardT);
+    $('mic').classList.remove('live'); $('micLabel').textContent = 'Tap & Speak';
+    const main = (finalText + ' ' + interim).trim();
+    if (!main) { $('heard').classList.remove('show'); return; }
+    // Try the alternatives the phone offers and keep the one that makes the most complete bill
+    const cands = [main];
+    alts.forEach((a, i) => a.slice(1).forEach((alt) => {
+      const copy = alts.map((x) => x[0]); copy[i] = alt; cands.push(joinResults(copy));
+    }));
+    const r = P.best(cands.slice(0, 12));
+    $('heard').textContent = '“' + r.heard + '”';
+    fillFrom(r);
+  }
+  $('mic').addEventListener('click', () => (listening ? stopListening() : startListening()));
+
+  // ---------- PDF ----------
+  function makePdf(b) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'mm', format: 'a5' });
+    const W = 148, M = 12;
+    const teal = [15, 118, 110];
+    doc.setFillColor(...teal); doc.rect(0, 0, W, 36, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(19);
+    doc.text(CLINIC.name, W / 2, 12, { align: 'center' });
+    doc.setFontSize(11.5);
+    doc.text(CLINIC.doctor, W / 2, 19, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    doc.text(CLINIC.degree, W / 2, 24, { align: 'center' });
+    doc.setFontSize(8.5);
+    doc.text(CLINIC.address, W / 2, 29.2, { align: 'center' });
+    doc.text('Phone: ' + CLINIC.phone, W / 2, 33.4, { align: 'center' });
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(12);
+    doc.text('BILL / RECEIPT', W / 2, 45, { align: 'center' });
+    doc.setDrawColor(...teal); doc.setLineWidth(0.4); doc.line(W / 2 - 18, 46.5, W / 2 + 18, 46.5);
+
+    doc.setFontSize(10);
+    let y = 55;
+    const lv = (label, value, x) => { doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139); doc.text(label, x, y);
+      doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42); doc.text(value, x + doc.getTextWidth(label) + 1.5, y); };
+    lv('Bill No:', String(b.no), M);
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139);
+    const dateStr = niceDate(b.date);
+    doc.setFont('helvetica', 'bold'); const dw = doc.getTextWidth(dateStr);
+    doc.setFont('helvetica', 'normal'); const lw = doc.getTextWidth('Date: ');
+    doc.text('Date:', W - M - dw - lw, y);
+    doc.setFont('helvetica', 'bold'); doc.setTextColor(15, 23, 42); doc.text(dateStr, W - M, y, { align: 'right' });
+    y = 62;
+    lv('Patient Name:', b.name, M);
+
+    // table
+    y = 70;
+    doc.setFillColor(236, 253, 245); doc.rect(M, y, W - 2 * M, 8, 'F');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(9.5); doc.setTextColor(17, 94, 89);
+    doc.text('No.', M + 2, y + 5.4); doc.text('Treatment', M + 13, y + 5.4); doc.text('Amount (Rs.)', W - M - 2, y + 5.4, { align: 'right' });
+    y += 8;
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(15, 23, 42); doc.setFontSize(10);
+    b.items.forEach((it, i) => {
+      const lines = doc.splitTextToSize(it.desc || '-', W - 2 * M - 48);
+      const h = Math.max(8, lines.length * 4.6 + 3.4);
+      doc.text(String(i + 1), M + 2, y + 5.4);
+      doc.text(lines, M + 13, y + 5.4);
+      doc.text(fmt(it.amount), W - M - 2, y + 5.4, { align: 'right' });
+      y += h;
+      doc.setDrawColor(226, 232, 240); doc.setLineWidth(0.2); doc.line(M, y, W - M, y);
+    });
+    y += 1;
+    doc.setFillColor(...teal); doc.rect(M, y, W - 2 * M, 9, 'F');
+    doc.setTextColor(255, 255, 255); doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
+    doc.text('TOTAL', M + 13, y + 6); doc.text('Rs. ' + fmt(b.total), W - M - 2, y + 6, { align: 'right' });
+    y += 15;
+    doc.setTextColor(15, 23, 42); doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    const words = doc.splitTextToSize('Amount in words: Rupees ' + P.inWords(b.total) + ' Only', W - 2 * M);
+    doc.text(words, M, y); y += words.length * 4.6 + 2;
+    doc.text('Payment mode: ' + (b.mode || 'Cash'), M, y); y += 5;
+    doc.text('Received with thanks.', M, y);
+
+    // signature
+    const sy = 185;
+    doc.setDrawColor(148, 163, 184); doc.setLineWidth(0.3); doc.line(W - M - 50, sy, W - M, sy);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(10); doc.text(CLINIC.doctor, W - M - 25, sy + 5, { align: 'center' });
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(100, 116, 139);
+    doc.text(CLINIC.degree, W - M - 25, sy + 9, { align: 'center' });
+    doc.setFontSize(7.5);
+    doc.text('Thank you for visiting Virani Dental Clinic.', W / 2, 204, { align: 'center' });
+    return doc;
+  }
+  function fileName(b) { return 'Bill-' + b.no + '-' + b.name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + b.date + '.pdf'; }
+
+  async function sharePdf(b) {
+    const blob = makePdf(b).output('blob');
+    const name = fileName(b);
+    const file = new File([blob], name, { type: 'application/pdf' });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); return; }
+      catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.target = '_blank'; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+
+  $('make').addEventListener('click', () => {
+    const items = readItems().map((i) => ({ desc: P.toEnglish(i.desc) || 'Dental Treatment', amount: i.amount }));
+    const name = P.toEnglish($('name').value.trim());
+    const total = items.reduce((s, i) => s + i.amount, 0);
+    if (!name || total <= 0) return;
+    const bills = load();
+    const b = {
+      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      no: nextNo(bills), date: $('date').value || today(), name, items, total,
+      mode: $('mode').value, heard: ($('heard').textContent || '').replace(/^“|”$/g, ''), createdAt: new Date().toISOString(),
+    };
+    bills.push(b);
+    if (!store(bills)) return;
+    try { localStorage.setItem(CKEY, String(b.no)); } catch (e) {}
+    sharePdf(b);
+    toast('Bill No. ' + b.no + ' saved');
+    resetForm();
+  });
+
+  // ---------- history ----------
+  function monthKey(iso) { return iso.slice(0, 7); }
+  function monthLabel(k) { const [y, m] = k.split('-').map(Number); return MON[m - 1] + ' ' + y; }
+
+  function renderHistory() {
+    const bills = load();
+    const t = today(), mk = monthKey(t);
+    const sum = (arr) => arr.reduce((s, b) => s + b.total, 0);
+    const tb = bills.filter((b) => b.date === t), mb = bills.filter((b) => monthKey(b.date) === mk);
+    $('sToday').textContent = 'Rs. ' + fmt(sum(tb)); $('sTodayN').textContent = 'Today · ' + tb.length;
+    $('sMonth').textContent = 'Rs. ' + fmt(sum(mb)); $('sMonthN').textContent = MON[Number(mk.slice(5)) - 1] + ' · ' + mb.length;
+    $('sAll').textContent = 'Rs. ' + fmt(sum(bills)); $('sAllN').textContent = 'All · ' + bills.length;
+
+    const months = Array.from(new Set(bills.map((b) => monthKey(b.date)).concat([mk]))).sort().reverse();
+    const sel = $('fMonth'), cur = sel.value || mk;
+    sel.innerHTML = '<option value="all">All months</option>' + months.map((m) => '<option value="' + m + '">' + monthLabel(m) + '</option>').join('');
+    sel.value = months.includes(cur) || cur === 'all' ? cur : mk;
+
+    const q = $('fSearch').value.trim().toLowerCase();
+    const shown = bills.filter((b) => (sel.value === 'all' || monthKey(b.date) === sel.value) &&
+      (!q || b.name.toLowerCase().includes(q) || String(b.no) === q))
+      .sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt));
+    $('periodLabel').textContent = (sel.value === 'all' ? 'All months' : monthLabel(sel.value)) + ' · ' + shown.length + ' bills';
+    $('periodTotal').textContent = 'Rs. ' + fmt(sum(shown));
+
+    if (!shown.length) { $('list').innerHTML = '<div class="empty">No bills here yet.</div>'; return; }
+    const byDay = {};
+    shown.forEach((b) => (byDay[b.date] = byDay[b.date] || []).push(b));
+    $('list').innerHTML = Object.keys(byDay).sort().reverse().map((d) => {
+      const arr = byDay[d];
+      return '<div class="day"><span>' + niceDate(d, true) + '</span><span>Rs. ' + fmt(sum(arr)) + ' · ' + arr.length + '</span></div>' +
+        arr.map((b) => '<div class="bill" data-id="' + b.id + '"><div class="l"><div class="n">' + esc(b.name) + '</div><div class="p">' +
+          esc(b.items.map((i) => i.desc).join(', ')) + '</div></div><div class="r"><div class="amt">Rs. ' + fmt(b.total) +
+          '</div><div class="no">No. ' + b.no + ' · ' + esc(b.mode || 'Cash') + '</div></div></div>').join('');
+    }).join('');
+  }
+  $('fMonth').addEventListener('change', renderHistory);
+  $('fSearch').addEventListener('input', renderHistory);
+
+  let open = null;
+  $('list').addEventListener('click', (e) => {
+    const el = e.target.closest('.bill'); if (!el) return;
+    open = load().find((b) => b.id === el.dataset.id); if (!open) return;
+    $('shName').textContent = open.name;
+    $('shSub').textContent = 'Bill No. ' + open.no + ' · ' + niceDate(open.date) + ' · ' + (open.mode || 'Cash');
+    $('shItems').innerHTML = open.items.map((i) => esc(i.desc) + ' — Rs. ' + fmt(i.amount)).join('<br>') + '<br><b>Total Rs. ' + fmt(open.total) + '</b>';
+    $('sheet').classList.add('show');
+  });
+  const closeSheet = () => { $('sheet').classList.remove('show'); };
+  $('shClose').addEventListener('click', closeSheet);
+  $('sheet').addEventListener('click', (e) => { if (e.target.id === 'sheet') closeSheet(); });
+  $('shShare').addEventListener('click', () => open && sharePdf(open));
+  $('shDel').addEventListener('click', () => {
+    if (!open || !confirm('Delete bill No. ' + open.no + ' for ' + open.name + '?')) return;
+    store(load().filter((b) => b.id !== open.id)); closeSheet(); renderHistory(); toast('Bill deleted');
+  });
+  $('shEdit').addEventListener('click', () => {
+    if (!open) return;
+    $('name').value = open.name; $('date').value = open.date; $('mode').value = open.mode || 'Cash';
+    $('items').innerHTML = ''; open.items.forEach((i) => addItem(i.desc, i.amount)); update();
+    closeSheet(); document.querySelector('nav button[data-t="new"]').click();
+    toast('Fix it, tap Make Bill, then delete the old one');
+  });
+
+  async function shareText(text, name, type) {
+    const file = new File([text], name, { type });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: name }); return; } catch (e) { if (e.name === 'AbortError') return; }
+    }
+    const url = URL.createObjectURL(file);
+    const a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  $('exportCsv').addEventListener('click', () => {
+    const bills = load().sort((a, b) => a.date.localeCompare(b.date) || a.no - b.no);
+    const q = (s) => '"' + String(s).replace(/"/g, '""') + '"';
+    const rows = [['Bill No', 'Date', 'Patient', 'Treatment', 'Amount', 'Paid by'].join(',')];
+    bills.forEach((b) => rows.push([b.no, b.date, q(b.name), q(b.items.map((i) => i.desc + ' (' + i.amount + ')').join('; ')), b.total, b.mode || 'Cash'].join(',')));
+    shareText('﻿' + rows.join('\n'), 'Virani-Dental-Bills-' + today() + '.csv', 'text/csv');
+  });
+  $('backup').addEventListener('click', () => {
+    shareText(JSON.stringify({ app: 'virani-dental-bills', v: 1, counter: nextNo(load()) - 1, bills: load() }), 'Virani-Bills-Backup-' + today() + '.json', 'application/json');
+  });
+  $('restoreBtn').addEventListener('click', () => $('restoreFile').click());
+  $('restoreFile').addEventListener('change', async (e) => {
+    const f = e.target.files[0]; if (!f) return;
+    try {
+      const data = JSON.parse(await f.text());
+      const incoming = Array.isArray(data) ? data : data.bills;
+      if (!Array.isArray(incoming)) throw new Error('not a backup file');
+      const have = load(), ids = new Set(have.map((b) => b.id));
+      const add = incoming.filter((b) => b && b.id && !ids.has(b.id));
+      store(have.concat(add));
+      if (data.counter) try { localStorage.setItem(CKEY, String(Math.max(data.counter, nextNo(have) - 1))); } catch (err) {}
+      toast(add.length + ' bills restored'); renderHistory();
+    } catch (err) { alert('Could not read that file: ' + err.message); }
+    e.target.value = '';
+  });
+})();
+</script>
+</body>
+</html>
