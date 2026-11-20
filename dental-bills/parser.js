@@ -227,13 +227,111 @@
     return s.split(/(\s+)/).map((p) => (GU.test(p) ? titleCase(translitWord(p)) : p)).join('');
   }
 
+  // ---------- Spoken date ----------
+  const MONTHS = {
+    january: 1, jan: 1, february: 2, feb: 2, march: 3, mar: 3, april: 4, apr: 4, may: 5, june: 6, jun: 6, july: 7, jul: 7,
+    august: 8, aug: 8, september: 9, sept: 9, sep: 9, october: 10, oct: 10, november: 11, nov: 11, december: 12, dec: 12,
+    'જાન્યુઆરી': 1, 'જાન્યુઆરિ': 1, 'ફેબ્રુઆરી': 2, 'ફેબ્રુઆરિ': 2, 'માર્ચ': 3, 'એપ્રિલ': 4, 'મે': 5, 'જૂન': 6, 'જુન': 6,
+    'જુલાઈ': 7, 'જુલાઇ': 7, 'ઓગસ્ટ': 8, 'ઑગસ્ટ': 8, 'ઓગષ્ટ': 8, 'સપ્ટેમ્બર': 9, 'સપ્ટેમ્બર': 9, 'ઓક્ટોબર': 10, 'ઑક્ટોબર': 10,
+    'નવેમ્બર': 11, 'નવેમ્બર': 11, 'ડિસેમ્બર': 12, 'ડીસેમ્બર': 12,
+  };
+  const ORD = new Set(['st', 'nd', 'rd', 'th', 'મી', 'ની', 'એ']);
+  const DATEWORD = new Set(['date', 'dated', 'tarikh', 'tarik', 'tareekh', 'તારીખ', 'તા']);
+  const TODAY = new Set(['today', 'aaje', 'aaj', 'આજે', 'આજ', 'આજની']);
+  const YEST = new Set(['yesterday', 'ગઈકાલે', 'ગઇકાલે', 'ગઈ', 'ગઇ', 'gai', 'gaikale', 'kale']);
+
+  function iso(y, m, d) {
+    const dt = new Date(y, m - 1, d);
+    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) return '';
+    return y + '-' + String(m).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+  }
+  function fullYear(y, now) {
+    if (y == null) return null;
+    y = Number(y);
+    if (y < 100) y += 2000;
+    return y >= 2000 && y <= now.getFullYear() + 1 ? y : null;
+  }
+  function withYear(d, m, y, now) {
+    if (y) return iso(y, m, d);
+    let out = iso(now.getFullYear(), m, d);
+    // a date said in January for "28 December" means last year
+    if (out && new Date(now.getFullYear(), m - 1, d) - now > 2 * 86400000) out = iso(now.getFullYear() - 1, m, d);
+    return out;
+  }
+  function shift(now, days) { const d = new Date(now); d.setDate(d.getDate() + days); return iso(d.getFullYear(), d.getMonth() + 1, d.getDate()); }
+
+  // numeric dates like 20/11/2026 or 20-11 must be pulled out before punctuation is removed
+  function pullNumericDate(text, now) {
+    let t = String(text || '').replace(/[૦-૯]/g, (d) => String('૦૧૨૩૪૫૬૭૮૯'.indexOf(d)));
+    let found = '';
+    t = t.replace(/(^|[^\d.])(\d{1,2})\s*([\/-])\s*(\d{1,2})(?:\s*\3\s*(\d{2,4}))?(?![\d.])/, (all, pre, d, sep, m, y) => {
+      const yy = fullYear(y, now);
+      const r = withYear(Number(d), Number(m), y ? yy : null, now);
+      if (!r || (y && !yy)) return all;
+      found = r; return pre + ' ';
+    });
+    if (!found) {
+      t = t.replace(/(^|[^\d.])(\d{1,2})\.(\d{1,2})\.(\d{2,4})(?![\d.])/, (all, pre, d, m, y) => {
+        const yy = fullYear(y, now); const r = yy && withYear(Number(d), Number(m), yy, now);
+        if (!r) return all; found = r; return pre + ' ';
+      });
+    }
+    return { text: t, date: found };
+  }
+
+  function findDate(tokens, used, now) {
+    const num = (i) => (i >= 0 && i < tokens.length && !used[i] && /^\d{1,4}$/.test(tokens[i]) ? Number(tokens[i]) : null);
+    const mark = (...idx) => idx.forEach((i) => { if (i >= 0 && i < tokens.length) used[i] = true; });
+    for (let i = 0; i < tokens.length; i++) {
+      const m = MONTHS[tokens[i]];
+      if (!m) continue;
+      // day before month: "20 november", "20th november", "20 મી નવેમ્બર"
+      let di = i - 1; if (di >= 0 && ORD.has(tokens[di])) di--;
+      let d = num(di);
+      let yi = i + 1, y = num(yi);
+      if (d == null || d < 1 || d > 31) {
+        // month before day: "november 20", "november 20th 2026"
+        di = i + 1; d = num(di);
+        if (d == null || d < 1 || d > 31) continue;
+        yi = di + 1; if (yi < tokens.length && ORD.has(tokens[yi])) { mark(yi); yi++; }
+        y = num(yi);
+      } else if (tokens[i - 1] !== String(d)) mark(i - 1);
+      const yy = y != null && y >= 2000 ? fullYear(y, now) : (y != null && y < 100 && y >= 20 ? fullYear(y, now) : null);
+      const r = withYear(d, m, yy, now);
+      if (!r) continue;
+      mark(i, di); if (yy) mark(yi);
+      if (DATEWORD.has(tokens[di - 1])) mark(di - 1);
+      return r;
+    }
+    for (let i = 0; i < tokens.length; i++) {
+      if (TODAY.has(tokens[i])) { mark(i); return shift(now, 0); }
+      if (YEST.has(tokens[i]) && (tokens[i] !== 'gai' || tokens[i + 1] === 'kale') && (tokens[i] !== 'ગઈ' && tokens[i] !== 'ગઇ' || /^કાલ/.test(tokens[i + 1] || ''))) {
+        mark(i); if (/^(kale|કાલે|કાલ)$/.test(tokens[i + 1] || '')) mark(i + 1); return shift(now, -1);
+      }
+      if (DATEWORD.has(tokens[i])) {
+        let j = i + 1; const d = num(j);
+        if (d == null || d < 1 || d > 31) continue;
+        mark(i, j); if (ORD.has(tokens[j + 1])) mark(j + 1);
+        let r = withYear(d, now.getMonth() + 1, null, now);
+        if (r && new Date(r) > now) { const pm = new Date(now.getFullYear(), now.getMonth() - 1, 1); r = iso(pm.getFullYear(), pm.getMonth() + 1, d); }
+        return r || '';
+      }
+    }
+    return '';
+  }
+
   // ---------- Main parse ----------
-  function parse(text) {
-    const tokens = normalize(text);
+  function parse(text, now) {
+    now = now || new Date();
+    const pre = pullNumericDate(text, now);
+    const tokens = normalize(pre.text);
     const used = new Array(tokens.length).fill(false);
     const marks = []; // {pos, type, ...}
+    const date = pre.date || findDate(tokens, used, now);
+    tokens.forEach((t, i) => { if (ORD.has(t) && i > 0 && /^\d/.test(tokens[i - 1]) && used[i - 1]) used[i] = true; });
 
     for (let i = 0; i < tokens.length;) {
+      if (used[i]) { i++; continue; }
       const m = matchProc(tokens, i);
       if (m) { marks.push({ pos: i, type: 'proc', name: m.name }); for (let j = 0; j < m.n; j++) used[i + j] = true; i += m.n; continue; }
       i++;
@@ -300,18 +398,18 @@
     let name = pick ? pick.slice(0, 4).map((i) => tokens[i]).join(' ') : '';
     name = titleCase(toEnglish(name));
 
-    return { name, items, mode, total: items.reduce((s, it) => s + (Number(it.amount) || 0), 0) };
+    return { name, date, items, mode, total: items.reduce((s, it) => s + (Number(it.amount) || 0), 0) };
   }
 
   function score(r) {
     return (r.name ? 2 : 0) + (r.items.length ? 2 : 0) + (r.items.some((i) => i.amount > 0) ? 2 : 0) +
-      (r.items.some((i) => i.desc !== 'Dental Treatment') ? 1 : 0);
+      (r.items.some((i) => i.desc !== 'Dental Treatment') ? 1 : 0) + (r.date ? 2 : 0);
   }
 
-  function best(candidates) {
+  function best(candidates, now) {
     let top = null, topScore = -1;
     for (const c of candidates) {
-      const r = parse(c);
+      const r = parse(c, now);
       const s = score(r);
       if (s > topScore) { top = Object.assign(r, { heard: c }); topScore = s; }
     }

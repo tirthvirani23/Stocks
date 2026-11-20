@@ -46,6 +46,7 @@
   input, select, textarea { width: 100%; font-size: 17px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); font-family: inherit; }
   input:focus, select:focus, textarea:focus { outline: 2px solid var(--teal); border-color: transparent; }
   .row2 { display: flex; gap: 10px; } .row2 > div { flex: 1; min-width: 0; }
+  input.need { border-color: var(--amber); background: #fffbeb; }
   .item { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
   .item .d { flex: 1 1 100%; min-width: 0; } .item .a { flex: 1; min-width: 0; }
   .item .x { flex: none; width: 36px; height: 36px; border: 0; border-radius: 50%; background: #fee2e2; color: var(--red); font-size: 20px; line-height: 1; }
@@ -100,12 +101,12 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8"/></svg>
         <span id="micLabel">Tap &amp; Speak</span>
       </button>
-      <p class="hint" id="hint">Say: <i>“Ramesh Patel, root canal, 3500, cash”</i></p>
+      <p class="hint" id="hint">Say: <i>“Ramesh Patel, 20 November, root canal, 3500, cash”</i></p>
       <div class="heard" id="heard"></div>
       <div class="msg" id="msg"></div>
       <button class="linkbtn" id="typeToggle">Type instead</button>
       <div id="typeBox" style="display:none;text-align:left">
-        <textarea id="typed" rows="2" placeholder="e.g. Ramesh Patel RCT 3500"></textarea>
+        <textarea id="typed" rows="2" placeholder="e.g. Ramesh Patel 20 November RCT 3500"></textarea>
         <button class="ghost" id="typedGo">Fill the bill from this</button>
       </div>
     </div>
@@ -220,8 +221,8 @@
     try { localStorage.setItem(LKEY, l); } catch (e) {}
     document.querySelectorAll('#lang button').forEach((b) => b.classList.toggle('on', b.dataset.l === l));
     $('hint').innerHTML = l === 'gu-IN'
-      ? 'બોલો: <i>“રમેશ પટેલ, રૂટ કેનાલ, સાડા ત્રણ હજાર, રોકડા”</i>'
-      : 'Say: <i>“Ramesh Patel, root canal, 3500, cash”</i>';
+      ? 'બોલો: <i>“રમેશ પટેલ, ૨૦ નવેમ્બર, રૂટ કેનાલ, સાડા ત્રણ હજાર, રોકડા”</i>'
+      : 'Say: <i>“Ramesh Patel, 20 November, root canal, 3500, cash”</i>';
   }
   document.querySelectorAll('#lang button').forEach((b) => b.addEventListener('click', () => setLang(b.dataset.l)));
   setLang(lang);
@@ -249,15 +250,17 @@
     const items = readItems();
     const total = items.reduce((s, i) => s + i.amount, 0);
     $('total').textContent = 'Rs. ' + fmt(total);
-    $('make').disabled = !($('name').value.trim() && total > 0);
+    $('make').disabled = !($('name').value.trim() && $('date').value && total > 0);
+    $('date').classList.toggle('need', !$('date').value);
   }
   function resetForm() {
-    $('name').value = ''; $('date').value = today(); $('mode').value = 'Cash';
+    $('name').value = ''; $('date').value = ''; $('mode').value = 'Cash';
     $('items').innerHTML = ''; addItem();
     $('heard').classList.remove('show'); $('msg').classList.remove('show');
     update();
   }
   $('name').addEventListener('input', update);
+  $('date').addEventListener('input', update); $('date').addEventListener('change', update);
   $('addItem').addEventListener('click', () => { addItem(); update(); });
   $('clear').addEventListener('click', resetForm);
   resetForm();
@@ -266,10 +269,11 @@
     if (r.name) $('name').value = r.name;
     if (r.items.length) { $('items').innerHTML = ''; r.items.forEach((i) => addItem(i.desc, i.amount)); }
     if (r.mode) $('mode').value = r.mode;
-    $('date').value = $('date').value || today();
+    if (r.date) $('date').value = r.date;
     update();
     const missing = [];
     if (!r.name) missing.push('patient name');
+    if (!r.date) missing.push('date');
     if (!r.items.length) missing.push('treatment');
     if (!r.items.some((i) => i.amount > 0)) missing.push('amount');
     showMsg(missing.length ? 'Could not catch the ' + missing.join(', ') + ' — please type it below, or tap the mic and say it again.' : '');
@@ -465,11 +469,11 @@
     const items = readItems().map((i) => ({ desc: P.toEnglish(i.desc) || 'Dental Treatment', amount: i.amount }));
     const name = P.toEnglish($('name').value.trim());
     const total = items.reduce((s, i) => s + i.amount, 0);
-    if (!name || total <= 0) return;
+    if (!name || total <= 0 || !$('date').value) return;
     const bills = load();
     const b = {
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      no: nextNo(bills), date: $('date').value || today(), name, items, total,
+      no: nextNo(bills), date: $('date').value, name, items, total,
       mode: $('mode').value, heard: ($('heard').textContent || '').replace(/^“|”$/g, ''), createdAt: new Date().toISOString(),
     };
     bills.push(b);

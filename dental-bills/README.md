@@ -2,8 +2,8 @@
 
 A phone app (web page) that makes patient bills as PDF by voice.
 
-**Use it:** tap the big button and say the patient name, treatment and amount, in English or Gujarati.
-Examples: “Ramesh Patel, root canal, 3500, cash” · “રમેશ પટેલ, રૂટ કેનાલ, સાડા ત્રણ હજાર, રોકડા”.
+**Use it:** tap the big button and say the patient name, date, treatment and amount, in English or Gujarati. The date is never filled in by itself — say it ("20 November", "20/11", "today", "આજે", "ગઈકાલે", "તારીખ 15").
+Examples: “Ramesh Patel, 20 November, root canal, 3500, cash” · “રમેશ પટેલ, ૨૦ નવેમ્બર, રૂટ કેનાલ, સાડા ત્રણ હજાર, રોકડા”.
 Several treatments work too: “Kiran Shah scaling 800 and filling 1200 GPay”. “Tooth 36” is added to the treatment.
 Check the boxes, tap **Make Bill (PDF)** and send it on WhatsApp or print it.
 
