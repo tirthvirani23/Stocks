@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Echo MCQ Practice</title>
+<meta name="theme-color" content="#1f5f8b">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<style>
+:root{
+  --bg:#f5f6f8;--card:#fff;--ink:#1c2430;--muted:#5d6b7c;--line:#dfe3ea;
+  --accent:#1f5f8b;--accent-ink:#fff;--ok:#16794a;--ok-bg:#e3f4ea;--bad:#b42318;--bad-bg:#fdecea;
+  --flag:#c27803;--flag-bg:#fff4dc;--chip:#eef1f5;--shadow:0 1px 3px rgba(20,30,50,.08);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11161d;--card:#1a212b;--ink:#e6ebf2;--muted:#9aa7b7;--line:#2c3542;
+  --accent:#5aa9e0;--accent-ink:#08131c;--ok:#4cc38a;--ok-bg:#15301f;--bad:#f2766b;--bad-bg:#3a1a18;
+  --flag:#f0b44c;--flag-bg:#3a2c10;--chip:#232c38;--shadow:none;}}
+:root[data-theme="dark"]{
+  --bg:#11161d;--card:#1a212b;--ink:#e6ebf2;--muted:#9aa7b7;--line:#2c3542;
+  --accent:#5aa9e0;--accent-ink:#08131c;--ok:#4cc38a;--ok-bg:#15301f;--bad:#f2766b;--bad-bg:#3a1a18;
+  --flag:#f0b44c;--flag-bg:#3a2c10;--chip:#232c38;--shadow:none;}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button{font:inherit;color:inherit;cursor:pointer}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);box-shadow:var(--shadow)}
+.bar{max-width:880px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px}
+.bar h1{font-size:17px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:6px 10px;font-size:14px;min-height:36px}
+.stats{max-width:880px;margin:0 auto;padding:0 16px 10px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.stat{background:var(--chip);border-radius:8px;padding:6px 10px}
+.stat b{display:block;font-size:18px;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.meter{height:4px;background:var(--line);border-radius:2px;margin-top:4px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--accent)}
+.stat.ok .meter i{background:var(--ok)}
+main{max-width:880px;margin:0 auto;padding:16px 16px 120px}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;align-items:center}
+select{font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-height:36px;max-width:100%}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
+.qhead{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--muted);font-size:14px}
+.qhead .num{font-weight:700;color:var(--ink);font-size:16px}
+.qhead .sp{flex:1}
+.flagbtn{border:1px solid var(--line);background:transparent;border-radius:8px;padding:5px 10px;font-size:14px}
+.flagbtn.on{background:var(--flag-bg);border-color:var(--flag);color:var(--flag);font-weight:600}
+.stem p{margin:0 0 10px;font-size:17px}
+.stem p.cap{font-size:14px;color:var(--muted);text-align:center}
+figure{margin:8px 0 12px;text-align:center}
+figure img{max-width:100%;height:auto;border-radius:6px;background:#000;cursor:zoom-in}
+.opts{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+.opt{display:flex;gap:10px;align-items:flex-start;text-align:left;width:100%;padding:11px 12px;border:1.5px solid var(--line);background:var(--card);border-radius:10px}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt .l{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:var(--chip);font-weight:700;font-size:14px}
+.opt .t{padding-top:1px}
+.opt:disabled{cursor:default}
+.opt.correct{border-color:var(--ok);background:var(--ok-bg)}
+.opt.correct .l{background:var(--ok);color:#fff}
+.opt.wrong{border-color:var(--bad);background:var(--bad-bg)}
+.opt.wrong .l{background:var(--bad);color:#fff}
+.opt.dim{opacity:.6}
+.verdict{margin-top:14px;padding:10px 12px;border-radius:10px;font-weight:700}
+.verdict.ok{background:var(--ok-bg);color:var(--ok)}
+.verdict.bad{background:var(--bad-bg);color:var(--bad)}
+.expl{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+.expl h3{margin:0 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.expl p{margin:0 0 10px}
+.retry{margin-top:4px;border:none;background:none;color:var(--accent);padding:4px 0;font-size:14px;text-decoration:underline}
+.nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);z-index:5;padding-bottom:env(safe-area-inset-bottom)}
+.nav .in{max-width:880px;margin:0 auto;padding:10px 16px;display:flex;gap:8px}
+.nav button{flex:1;min-height:44px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-weight:600}
+.nav button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.nav button:disabled{opacity:.4;cursor:default}
+.panel{position:fixed;inset:0;z-index:20;background:rgba(0,0,0,.45);display:none}
+.panel.open{display:block}
+.sheet{position:absolute;right:0;top:0;bottom:0;width:min(440px,100%);background:var(--card);overflow:auto;padding:16px}
+.sheet h2{font-size:18px;margin:0 0 4px}
+.sheet h4{margin:16px 0 6px;font-size:14px;color:var(--muted)}
+.close{float:right}
+.legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);margin:8px 0}
+.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-2px;margin-right:4px;border:1px solid var(--line)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(40px,1fr));gap:5px}
+.cell{position:relative;height:36px;border-radius:6px;border:1px solid var(--line);background:var(--card);font-size:13px;font-variant-numeric:tabular-nums}
+.cell.c{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.cell.w{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+.cell.f::after{content:"";position:absolute;top:2px;right:2px;width:7px;height:7px;border-radius:50%;background:var(--flag)}
+.cell.cur{outline:2px solid var(--accent);outline-offset:1px}
+.chrow{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid var(--line)}
+.chrow span{color:var(--muted);font-variant-numeric:tabular-nums}
+.btnrow{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.note{font-size:13px;color:var(--muted)}
+.empty{padding:30px;text-align:center;color:var(--muted)}
+#zoom{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.92);display:none;align-items:center;justify-content:center;padding:10px;cursor:zoom-out}
+#zoom.open{display:flex}
+#zoom img{max-width:100%;max-height:100%}
+.toast{position:fixed;left:50%;bottom:80px;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:14px;z-index:40;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+kbd{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px}
+@media (max-width:520px){.stat b{font-size:16px}.card{padding:14px}.stem p{font-size:16px}}
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <h1>Echo Board Review — MCQs</h1>
+    <button class="iconbtn" id="themeBtn" title="Toggle theme" aria-label="Toggle theme">◐</button>
+    <button class="iconbtn" id="menuBtn" aria-label="Open question navigator">☰ Questions</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><b id="sDone">0%</b><span id="sDoneL">Completed 0/500</span><div class="meter"><i id="mDone"></i></div></div>
+    <div class="stat ok"><b id="sCorr">–</b><span id="sCorrL">Correct 0/0</span><div class="meter"><i id="mCorr"></i></div></div>
+    <div class="stat"><b id="sFlag">0</b><span>Flagged</span><div class="meter"><i id="mFlag" style="background:var(--flag)"></i></div></div>
+  </div>
+</header>
+
+<main>
+  <div class="toolbar">
+    <select id="chapSel" aria-label="Jump to chapter"></select>
+    <select id="filterSel" aria-label="Filter questions">
+      <option value="all">All questions</option>
+      <option value="flagged">Flagged only</option>
+      <option value="wrong">Incorrect only</option>
+      <option value="unanswered">Unanswered only</option>
+    </select>
+    <span class="note" id="filterInfo"></span>
+  </div>
+  <div id="view"></div>
+</main>
+
+<nav class="nav"><div class="in">
+  <button id="prevBtn">‹ Previous</button>
+  <button id="flagBtn2">⚑ Flag</button>
+  <button id="nextBtn" class="primary">Next ›</button>
+</div></nav>
+
+<div class="panel" id="panel"><div class="sheet">
+  <button class="iconbtn close" id="closeBtn">✕</button>
+  <h2>Navigator</h2>
+  <div class="legend"><span><i style="background:var(--ok-bg);border-color:var(--ok)"></i>Correct</span><span><i style="background:var(--bad-bg);border-color:var(--bad)"></i>Incorrect</span><span><i></i>Not attempted</span><span><i style="background:var(--flag);border-color:var(--flag);border-radius:50%"></i>Flagged</span></div>
+  <div id="gridWrap"></div>
+  <h4>Progress by chapter</h4>
+  <div id="chapStats"></div>
+  <h4>Offline &amp; data</h4>
+  <div class="note" id="offlineStatus">Checking offline status…</div>
+  <div class="btnrow">
+    <button class="iconbtn" id="exportBtn">Export progress</button>
+    <button class="iconbtn" id="importBtn">Import progress</button>
+    <button class="iconbtn" id="resetBtn">Reset all progress</button>
+    <input type="file" id="importFile" accept="application/json" hidden>
+  </div>
+  <p class="note">Keyboard: <kbd>A</kbd>–<kbd>F</kbd> answer · <kbd>←</kbd>/<kbd>→</kbd> navigate · <kbd>F</kbd> flag. Progress is saved on this device automatically.</p>
+  <p class="note">Questions, answers and explanations: <i>Echocardiography Board Review: 500 Multiple Choice Questions with Discussion</i>, 2nd ed., Pai &amp; Varadarajan (Wiley, 2014). For personal study.</p>
+</div></div>
+
+<div id="zoom"><img alt=""></div>
+<div class="toast" id="toast"></div>
+
+<script src="data.js"></script>
+<script>
+(function(){
+const Q = window.MCQ || [];
+const TOTAL = Q.length;
+const IMG = window.MCQ_IMG || {};
+const KEY = 'echoMCQ.v1';
+const $ = id => document.getElementById(id);
+
+// ---------- state ----------
+let S = {ans:{}, flags:{}, pos:0, filter:'all', theme:''};
+try { const raw = localStorage.getItem(KEY); if (raw) S = Object.assign(S, JSON.parse(raw)); } catch(e){}
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(S)); } catch(e){} }
+
+if (S.theme) document.documentElement.setAttribute('data-theme', S.theme);
+$('themeBtn').onclick = () => {
+  const dark = S.theme ? S.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+  S.theme = dark ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', S.theme); save();
+};
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const src = name => IMG[name] || ('img/' + name);
+const status = q => { const a = S.ans[q.n]; return a == null ? '' : (a === q.a ? 'c' : 'w'); };
+
+// ---------- filtering ----------
+function visible(){
+  const f = S.filter;
+  return Q.map((q,i)=>i).filter(i => {
+    const q = Q[i], st = status(q);
+    if (f === 'flagged') return !!S.flags[q.n];
+    if (f === 'wrong') return st === 'w';
+    if (f === 'unanswered') return st === '';
+    return true;
+  });
+}
+
+// ---------- stats ----------
+function stats(){
+  let done=0, corr=0, flag=0;
+  for (const q of Q){ const st=status(q); if(st){done++; if(st==='c')corr++;} if(S.flags[q.n])flag++; }
+  const pd = TOTAL ? done/TOTAL*100 : 0, pc = done ? corr/done*100 : 0;
+  $('sDone').textContent = pd.toFixed(1) + '%';
+  $('sDoneL').textContent = `Completed ${done}/${TOTAL}`;
+  $('mDone').style.width = pd + '%';
+  $('sCorr').textContent = done ? pc.toFixed(1) + '%' : '–';
+  $('sCorrL').textContent = `Correct ${corr}/${done}`;
+  $('mCorr').style.width = pc + '%';
+  $('sFlag').textContent = flag;
+  $('mFlag').style.width = (TOTAL ? flag/TOTAL*100 : 0) + '%';
+}
+
+// ---------- chapter select ----------
+const chapters = [...new Set(Q.map(q=>q.ch))];
+$('chapSel').innerHTML = chapters.map(c => {
+  const qs = Q.filter(q=>q.ch===c);
+  return `<option value="${c}">Chapter ${c} (Q${qs[0].n}–${qs[qs.length-1].n})</option>`;
+}).join('');
+$('chapSel').onchange = e => {
+  const c = +e.target.value;
+  if (S.filter !== 'all'){ S.filter='all'; $('filterSel').value='all'; }
+  S.pos = Q.findIndex(q=>q.ch===c); save(); render(true);
+};
+$('filterSel').value = S.filter;
+$('filterSel').onchange = e => {
+  S.filter = e.target.value;
+  const v = visible();
+  if (v.length && !v.includes(S.pos)) S.pos = v.find(i=>i>=S.pos) ?? v[0];
+  save(); render(true);
+};
+
+// ---------- render question ----------
+function blockHTML(b, isStem){
+  if (typeof b === 'object') return `<figure><img loading="lazy" src="${src(b.img)}" alt="Echo figure"></figure>`;
+  return `<p${isStem ? '' : ''}>${esc(b)}</p>`;
+}
+function render(scrollTop){
+  stats();
+  const v = visible();
+  const view = $('view');
+  $('filterInfo').textContent = S.filter === 'all' ? '' : `${v.length} question${v.length===1?'':'s'}`;
+  if (!v.length){
+    view.innerHTML = `<div class="card empty">No questions match this filter yet.</div>`;
+    $('prevBtn').disabled = $('nextBtn').disabled = $('flagBtn2').disabled = true;
+    return;
+  }
+  if (!v.includes(S.pos)) S.pos = v.find(i=>i>=S.pos) ?? v[v.length-1];
+  const q = Q[S.pos], vi = v.indexOf(S.pos);
+  $('chapSel').value = q.ch;
+  const picked = S.ans[q.n];
+  const answered = picked != null;
+  const flagged = !!S.flags[q.n];
+  // stem: first text is stem; text after an image is a caption
+  let seenImg = false;
+  const stem = q.q.map(b => {
+    if (typeof b === 'object'){ seenImg = true; return blockHTML(b, true); }
+    return `<p class="${seenImg ? 'cap' : ''}">${esc(b)}</p>`;
+  }).join('');
+  const opts = q.o.map((t,i) => {
+    const L = String.fromCharCode(65+i);
+    let cls = '';
+    if (answered){ if (L===q.a) cls='correct'; else if (L===picked) cls='wrong'; else cls='dim'; }
+    return `<button class="opt ${cls}" data-l="${L}" ${answered?'disabled':''}><span class="l">${L}</span><span class="t">${esc(t)}</span></button>`;
+  }).join('');
+  let after = '';
+  if (answered){
+    const ok = picked === q.a;
+    after = `<div class="verdict ${ok?'ok':'bad'}">${ok ? '✓ True — your answer is correct.' : `✗ False — correct answer is ${q.a}. ${esc(q.o[q.a.charCodeAt(0)-65]||'')}`}</div>
+      <div class="expl"><h3>Answer ${q.a} — Explanation</h3>${q.e.map(b=>blockHTML(b,false)).join('')}</div>
+      <button class="retry" id="retryBtn">Clear my answer &amp; retry this question</button>`;
+  }
+  view.innerHTML = `<div class="card">
+    <div class="qhead"><span class="num">Q${q.n}</span><span>Chapter ${q.ch}</span><span class="sp"></span>
+      <span>${vi+1}/${v.length}</span>
+      <button class="flagbtn ${flagged?'on':''}" id="flagBtn">${flagged?'⚑ Flagged':'⚐ Flag'}</button></div>
+    <div class="stem">${stem}</div>
+    <div class="opts">${opts}</div>${after}</div>`;
+  view.querySelectorAll('.opt').forEach(b => b.onclick = () => answer(b.dataset.l));
+  view.querySelectorAll('figure img').forEach(im => im.onclick = () => zoom(im.src));
+  $('flagBtn').onclick = toggleFlag;
+  if ($('retryBtn')) $('retryBtn').onclick = () => { delete S.ans[q.n]; save(); render(); };
+  $('prevBtn').disabled = vi <= 0;
+  $('nextBtn').disabled = vi >= v.length-1;
+  $('flagBtn2').disabled = false;
+  $('flagBtn2').textContent = flagged ? '⚑ Unflag' : '⚐ Flag';
+  if (scrollTop) window.scrollTo(0,0);
+  if ($('panel').classList.contains('open')) renderPanel();
+}
+
+function answer(L){
+  const q = Q[S.pos];
+  if (S.ans[q.n] != null || L.charCodeAt(0)-65 >= q.o.length) return;
+  S.ans[q.n] = L; save(); render();
+  const v = document.querySelector('.verdict'); if (v) v.scrollIntoView({behavior:'smooth', block:'nearest'});
+}
+function toggleFlag(){
+  const q = Q[S.pos];
+  if (S.flags[q.n]) delete S.flags[q.n]; else S.flags[q.n] = 1;
+  save(); toast(S.flags[q.n] ? `Q${q.n} flagged for review` : `Q${q.n} unflagged`);
+  render();
+}
+function go(d){
+  const v = visible(), vi = v.indexOf(S.pos), ni = vi + d;
+  if (ni < 0 || ni >= v.length) return;
+  S.pos = v[ni]; save(); render(true);
+}
+$('prevBtn').onclick = () => go(-1);
+$('nextBtn').onclick = () => go(1);
+$('flagBtn2').onclick = toggleFlag;
+
+// ---------- panel ----------
+function renderPanel(){
+  const v = new Set(visible());
+  let html = '';
+  for (const c of chapters){
+    const qs = Q.map((q,i)=>[q,i]).filter(([q])=>q.ch===c);
+    html += `<h4>Chapter ${c}</h4><div class="grid">` + qs.map(([q,i]) =>
+      `<button class="cell ${status(q)} ${S.flags[q.n]?'f':''} ${i===S.pos?'cur':''}" data-i="${i}" ${v.has(i)?'':'style="opacity:.35"'}>${q.n}</button>`).join('') + `</div>`;
+  }
+  $('gridWrap').innerHTML = html;
+  $('gridWrap').querySelectorAll('.cell').forEach(b => b.onclick = () => {
+    const i = +b.dataset.i;
+    if (!visible().includes(i)){ S.filter='all'; $('filterSel').value='all'; }
+    S.pos = i; save(); closePanel(); render(true);
+  });
+  $('chapStats').innerHTML = chapters.map(c => {
+    const qs = Q.filter(q=>q.ch===c); let d=0,k=0;
+    qs.forEach(q=>{const st=status(q); if(st){d++; if(st==='c')k++;}});
+    return `<div class="chrow"><b>Chapter ${c}</b><span>${d}/${qs.length} done · ${d?Math.round(k/d*100)+'% correct':'—'}</span></div>`;
+  }).join('');
+  const cur = $('gridWrap').querySelector('.cur'); if (cur) cur.scrollIntoView({block:'center'});
+}
+function openPanel(){ $('panel').classList.add('open'); renderPanel(); }
+function closePanel(){ $('panel').classList.remove('open'); }
+$('menuBtn').onclick = openPanel;
+$('closeBtn').onclick = closePanel;
+$('panel').onclick = e => { if (e.target.id === 'panel') closePanel(); };
+
+// ---------- zoom ----------
+function zoom(s){ $('zoom').querySelector('img').src = s; $('zoom').classList.add('open'); }
+$('zoom').onclick = () => $('zoom').classList.remove('open');
+
+// ---------- data ----------
+$('exportBtn').onclick = () => {
+  const blob = new Blob([JSON.stringify({ans:S.ans, flags:S.flags, pos:S.pos})], {type:'application/json'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'echo-mcq-progress.json'; document.body.appendChild(a); a.click(); a.remove();
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  f.text().then(t => { const d = JSON.parse(t); S.ans = d.ans||{}; S.flags = d.flags||{}; S.pos = d.pos||0; save(); render(true); toast('Progress imported'); })
+   .catch(() => toast('Could not read that file'));
+};
+$('resetBtn').onclick = () => {
+  if (!confirm('Erase all answers and flags on this device?')) return;
+  S.ans = {}; S.flags = {}; S.pos = 0; save(); render(true); toast('Progress reset');
+};
+
+// ---------- keyboard ----------
+document.addEventListener('keydown', e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || /input|select|textarea/i.test(e.target.tagName)) return;
+  if ($('zoom').classList.contains('open')){ if (e.key==='Escape') $('zoom').classList.remove('open'); return; }
+  if (e.key === 'Escape') return closePanel();
+  if (e.key === 'ArrowRight') return go(1);
+  if (e.key === 'ArrowLeft') return go(-1);
+  const k = e.key.toUpperCase();
+  if (k === 'F' && !(Q[S.pos] && Q[S.pos].o.length >= 6 && S.ans[Q[S.pos].n] == null)) return toggleFlag();
+  if (/^[A-H]$/.test(k)) answer(k);
+});
+
+let tt; function toast(m){ const t=$('toast'); t.textContent=m; t.classList.add('show'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('show'),1500); }
+
+// ---------- offline ----------
+function setOffline(msg){ $('offlineStatus').textContent = msg; }
+if (Object.keys(IMG).length){
+  setOffline('This is the single-file edition: everything (all 500 questions and figures) is inside this file, so it works fully offline.');
+} else if ('serviceWorker' in navigator && location.protocol.startsWith('http')){
+  navigator.serviceWorker.register('sw.js').then(() => {
+    setOffline('Downloading questions and figures for offline use…');
+    navigator.serviceWorker.addEventListener('message', ev => {
+      const d = ev.data || {};
+      if (d.type === 'progress') setOffline(`Downloading for offline use… ${d.done}/${d.total} files`);
+      if (d.type === 'ready'){ setOffline('✓ Saved for offline use. You can now open this page without internet.'); }
+    });
+    navigator.serviceWorker.ready.then(reg => reg.active && reg.active.postMessage({type:'check'}));
+  }).catch(() => setOffline('Offline caching unavailable in this browser.'));
+} else {
+  setOffline('Opened as a local file. Offline works as long as the img folder stays next to this file.');
+}
+
+render(true);
+})();
+</script>
+</body>
+</html>
