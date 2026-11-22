@@ -8,6 +8,7 @@
   --bg:#0f1418; --panel:#182027; --fg:#e6edf2; --muted:#93a1ad; --line:#2a353f;
   --accent:#3cc2ad; --accent-fg:#06201c; --done:#12352f; --done-fg:#8fe3d4; --cur:#e6edf2; color-scheme:dark}}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--body);
   padding:20px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
 a{color:var(--accent)}
@@ -22,7 +23,7 @@ h1{font:600 1.6rem/1.2 var(--display);margin:0;text-wrap:balance}
 .frame{position:relative;width:100%;max-width:100%;aspect-ratio:16/9;background:#000;border-radius:10px;overflow:hidden}
 .frame>div,.frame iframe{position:absolute;inset:0;width:100%;height:100%}
 .msg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
-  padding:20px;color:#cfd8df;font-size:.95rem}
+  padding:20px;color:#cfd8df;font-size:.95rem;pointer-events:none}
 .now{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px}
 .count{font:600 .8rem var(--display);letter-spacing:.06em;text-transform:uppercase;color:var(--accent);
   font-variant-numeric:tabular-nums}
