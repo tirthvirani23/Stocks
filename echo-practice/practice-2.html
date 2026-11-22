@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Echo Practice 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600&display=swap">
+<link rel="stylesheet" href="style.css"></head><body>
+<div class="wrap">
+<header><h1>Echo Practice 2</h1><a class="back" href="index.html">← All echo practice</a></header>
+<div class="layout">
+<section class="stage">
+  <div class="frame"><div id="yt"></div><div class="msg" id="msg">Loading player…</div></div>
+  <div class="now"><span class="count" id="count">Video – of –</span><span class="vtitle" id="vtitle"></span></div>
+  <div class="controls">
+    <button id="prev">← Previous</button>
+    <button id="next" class="primary">Next →</button>
+    <button id="replay" title="Go back 5 seconds (R)">↺ 5 sec</button>
+    <button id="mark">Mark as done</button>
+    <span class="spacer"></span>
+    <select id="speed" aria-label="Playback speed">
+      <option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1">1× speed</option>
+      <option value="1.25">1.25×</option><option value="1.5">1.5×</option></select>
+    <label class="toggle"><input type="checkbox" id="autonext"> Auto-play next</label>
+  </div>
+  <p class="hint">Keys: <kbd>←</kbd> <kbd>→</kbd> previous / next, <kbd>R</kbd> back 5 seconds. A video is marked done when it finishes. Your place and progress are saved in this browser.</p>
+</section>
+<aside>
+  <h2>Videos <span id="progress"></span></h2>
+  <div class="bar"><i id="barfill"></i></div>
+  <div class="grid" id="grid"></div>
+  <button class="reset" id="reset">Clear done marks</button>
+</aside>
+</div></div>
+<script>window.ECHO = {key:"echo2",sources:[{playlist:"PLdLUoX4jbn3jFrQJXoBpOSGdnPQzvHh4o"}]};</script>
+<script src="player.js"></script>
+</body></html>
